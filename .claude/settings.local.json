@@ -1,7 +1,12 @@
 {
   "permissions": {
     "allow": [
-      "Bash(php test-central-db.php:*)"
+      "Bash(php test-central-db.php:*)",
+      "Bash(rm:*)",
+      "Bash(php artisan:*)",
+      "Bash(php -r:*)",
+      "Bash(composer dump-autoload:*)",
+      "Bash(tree:*)"
     ],
     "deny": [],
     "ask": []
