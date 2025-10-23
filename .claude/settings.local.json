@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php test-central-db.php:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

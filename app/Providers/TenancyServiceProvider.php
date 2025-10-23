@@ -1,148 +1,93 @@
 <?php
 
-declare(strict_types=1);
-
 namespace App\Providers;
 
-use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
-use Stancl\JobPipeline\JobPipeline;
-use Stancl\Tenancy\Events;
-use Stancl\Tenancy\Jobs;
-use Stancl\Tenancy\Listeners;
-use Stancl\Tenancy\Middleware;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 
 class TenancyServiceProvider extends ServiceProvider
 {
-    // By default, no namespace is used to support the callable array syntax.
-    public static string $controllerNamespace = '';
-
-    public function events()
-    {
-        return [
-            // Tenant events
-            Events\CreatingTenant::class => [],
-            Events\TenantCreated::class => [
-                JobPipeline::make([
-                    Jobs\CreateDatabase::class,
-                    Jobs\MigrateDatabase::class,
-                    // Jobs\SeedDatabase::class,
-
-                    // Your own jobs to prepare the tenant.
-                    // Provision API keys, create S3 buckets, anything you want!
-
-                ])->send(function (Events\TenantCreated $event) {
-                    return $event->tenant;
-                })->shouldBeQueued(false), // `false` by default, but you probably want to make this `true` for production.
-            ],
-            Events\SavingTenant::class => [],
-            Events\TenantSaved::class => [],
-            Events\UpdatingTenant::class => [],
-            Events\TenantUpdated::class => [],
-            Events\DeletingTenant::class => [],
-            Events\TenantDeleted::class => [
-                JobPipeline::make([
-                    Jobs\DeleteDatabase::class,
-                ])->send(function (Events\TenantDeleted $event) {
-                    return $event->tenant;
-                })->shouldBeQueued(false), // `false` by default, but you probably want to make this `true` for production.
-            ],
-
-            // Domain events
-            Events\CreatingDomain::class => [],
-            Events\DomainCreated::class => [],
-            Events\SavingDomain::class => [],
-            Events\DomainSaved::class => [],
-            Events\UpdatingDomain::class => [],
-            Events\DomainUpdated::class => [],
-            Events\DeletingDomain::class => [],
-            Events\DomainDeleted::class => [],
-
-            // Database events
-            Events\DatabaseCreated::class => [],
-            Events\DatabaseMigrated::class => [],
-            Events\DatabaseSeeded::class => [],
-            Events\DatabaseRolledBack::class => [],
-            Events\DatabaseDeleted::class => [],
-
-            // Tenancy events
-            Events\InitializingTenancy::class => [],
-            Events\TenancyInitialized::class => [
-                Listeners\BootstrapTenancy::class,
-            ],
-
-            Events\EndingTenancy::class => [],
-            Events\TenancyEnded::class => [
-                Listeners\RevertToCentralContext::class,
-            ],
-
-            Events\BootstrappingTenancy::class => [],
-            Events\TenancyBootstrapped::class => [],
-            Events\RevertingToCentralContext::class => [],
-            Events\RevertedToCentralContext::class => [],
-
-            // Resource syncing
-            Events\SyncedResourceSaved::class => [
-                Listeners\UpdateSyncedResource::class,
-            ],
-
-            // Fired only when a synced resource is changed in a different DB than the origin DB (to avoid infinite loops)
-            Events\SyncedResourceChangedInForeignDatabase::class => [],
-        ];
-    }
-
-    public function register()
+    /**
+     * Register services.
+     */
+    public function register(): void
     {
         //
     }
 
-    public function boot()
+    /**
+     * Bootstrap services.
+     */
+    public function boot(): void
     {
-        $this->bootEvents();
-        $this->mapRoutes();
+        // Événement : Initialisation du tenant (switch DB)
+        Event::listen(
+            \Stancl\Tenancy\Events\TenancyInitialized::class,
+            function ($event) {
+                $tenant = $event->tenancy->tenant;
 
-        $this->makeTenancyMiddlewareHighestPriority();
-    }
+                // Configuration dynamique de la connexion tenant
+                config([
+                    'database.connections.tenant' => [
+                        'driver' => 'mysql',
+                        'host' => $tenant->site_db_host,
+                        'port' => 3306,
+                        'database' => $tenant->site_db_name,
+                        'username' => $tenant->site_db_login,
+                        'password' => $tenant->site_db_password,
+                        'charset' => 'utf8mb4',
+                        'collation' => 'utf8mb4_unicode_ci',
+                        'prefix' => '',
+                        'strict' => true,
+                        'engine' => null,
+                        'options' => extension_loaded('pdo_mysql') ? array_filter([
+                            \PDO::ATTR_PERSISTENT => true,
+                            \PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => false,
+                        ]) : [],
+                    ],
+                ]);
 
-    protected function bootEvents()
-    {
-        foreach ($this->events() as $event => $listeners) {
-            foreach ($listeners as $listener) {
-                if ($listener instanceof JobPipeline) {
-                    $listener = $listener->toListener();
+                // Purger et reconnecter
+                DB::purge('tenant');
+                DB::reconnect('tenant');
+
+                // Définir comme connexion par défaut
+                DB::setDefaultConnection('tenant');
+
+                // Logger pour debug
+                if (config('app.debug')) {
+                    logger()->info("Tenancy initialized", [
+                        'tenant_id' => $tenant->site_id,
+                        'host' => $tenant->site_host,
+                        'database' => $tenant->site_db_name,
+                    ]);
                 }
-
-                Event::listen($event, $listener);
             }
-        }
-    }
+        );
 
-    protected function mapRoutes()
-    {
-        $this->app->booted(function () {
-            if (file_exists(base_path('routes/tenant.php'))) {
-                Route::namespace(static::$controllerNamespace)
-                    ->group(base_path('routes/tenant.php'));
+        // Événement : Fin du tenant (retour à central)
+        Event::listen(
+            \Stancl\Tenancy\Events\TenancyEnded::class,
+            function () {
+                // Revenir à la connexion centrale
+                DB::setDefaultConnection('mysql');
+
+                if (config('app.debug')) {
+                    logger()->info("Tenancy ended, switched back to central DB");
+                }
             }
-        });
-    }
+        );
 
-    protected function makeTenancyMiddlewareHighestPriority()
-    {
-        $tenancyMiddleware = [
-            // Even higher priority than the initialization middleware
-            Middleware\PreventAccessFromCentralDomains::class,
-
-            Middleware\InitializeTenancyByDomain::class,
-            Middleware\InitializeTenancyBySubdomain::class,
-            Middleware\InitializeTenancyByDomainOrSubdomain::class,
-            Middleware\InitializeTenancyByPath::class,
-            Middleware\InitializeTenancyByRequestData::class,
-        ];
-
-        foreach (array_reverse($tenancyMiddleware) as $middleware) {
-            $this->app[\Illuminate\Contracts\Http\Kernel::class]->prependToMiddlewarePriority($middleware);
-        }
+        // Événement : Création d'un nouveau tenant
+        Event::listen(
+            \Stancl\Tenancy\Events\TenantCreated::class,
+            function ($event) {
+                logger()->info("Tenant created", [
+                    'tenant_id' => $event->tenant->site_id,
+                    'host' => $event->tenant->site_host,
+                ]);
+            }
+        );
     }
 }
