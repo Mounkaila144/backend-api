@@ -15,6 +15,25 @@ use Illuminate\Validation\ValidationException;
 class AuthController extends Controller
 {
     /**
+     * Vérifier le mot de passe (supporte MD5 legacy et bcrypt)
+     */
+    private function checkPassword(string $plainPassword, string $hashedPassword): bool
+    {
+        // Si le hash fait 60 caractères, c'est bcrypt
+        if (strlen($hashedPassword) === 60) {
+            return Hash::check($plainPassword, $hashedPassword);
+        }
+
+        // Si le hash fait 32 caractères, c'est MD5 (legacy)
+        if (strlen($hashedPassword) === 32) {
+            return md5($plainPassword) === $hashedPassword;
+        }
+
+        // Format inconnu
+        return false;
+    }
+
+    /**
      * Login SUPERADMIN (base centrale)
      * POST /api/superadmin/auth/login
      */
@@ -31,7 +50,7 @@ class AuthController extends Controller
             ->where('username', $validated['username'])
             ->first();
 
-        if (!$user || !Hash::check($validated['password'], $user->password)) {
+        if (!$user || !$this->checkPassword($validated['password'], $user->password)) {
             throw ValidationException::withMessages([
                 'username' => ['Invalid credentials'],
             ]);
@@ -84,7 +103,7 @@ class AuthController extends Controller
             ->active()
             ->first();
 
-        if (!$user || !Hash::check($validated['password'], $user->password)) {
+        if (!$user || !$this->checkPassword($validated['password'], $user->password)) {
             throw ValidationException::withMessages([
                 'username' => ['Invalid credentials'],
             ]);

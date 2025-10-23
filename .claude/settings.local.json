@@ -10,7 +10,10 @@
       "Bash(powershell -ExecutionPolicy Bypass -File:*)",
       "Bash(powershell:*)",
       "Bash(netstat:*)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(php update-password-column.php:*)",
+      "Bash(php migrate-password.php:*)",
+      "Bash(php restore-md5-password.php:*)"
     ],
     "deny": [],
     "ask": []

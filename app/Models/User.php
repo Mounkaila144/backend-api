@@ -55,7 +55,6 @@ class User extends Authenticatable
      * Cast des types
      */
     protected $casts = [
-        'is_active' => 'boolean',
         'lastlogin' => 'datetime',
     ];
 
@@ -72,6 +71,7 @@ class User extends Authenticatable
      */
     public function scopeActive($query)
     {
-        return $query->where('is_active', 1);
+        return $query->where('is_active', 'YES')
+                     ->where('status', 'ACTIVE');
     }
 }
