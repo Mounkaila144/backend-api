@@ -24,7 +24,6 @@ Write-Host "📝 Creating route files..." -ForegroundColor Yellow
 
 $moduleLower = $ModuleName.ToLower()
 
-# Route Admin (utilise heredoc littéral pour éviter l'interprétation PowerShell)
 $adminRoute = @'
 <?php
 use Illuminate\Support\Facades\Route;
@@ -44,7 +43,6 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'tenant'])->group(function (
 });
 '@
 
-# Route Superadmin
 $superadminRoute = @'
 <?php
 use Illuminate\Support\Facades\Route;
@@ -64,7 +62,6 @@ Route::prefix('superadmin')->middleware(['auth:sanctum'])->group(function () {
 });
 '@
 
-# Route Frontend
 $frontendRoute = @'
 <?php
 use Illuminate\Support\Facades\Route;
@@ -115,9 +112,3 @@ Write-Host "└── Routes\"
 Write-Host "    ├── admin.php          # middleware: ['tenant']"
 Write-Host "    ├── superadmin.php     # NO tenant middleware"
 Write-Host "    └── frontend.php       # middleware: ['tenant']"
-Write-Host ""
-Write-Host "🎯 Next steps:" -ForegroundColor Yellow
-Write-Host "1. Create models: php artisan module:make-model ModelName $ModuleName"
-Write-Host "2. Create repositories in: Modules\$ModuleName\Repositories\"
-Write-Host "3. Implement controllers in: Modules\$ModuleName\Http\Controllers\"
-Write-Host "4. Enable module: php artisan module:enable $ModuleName"

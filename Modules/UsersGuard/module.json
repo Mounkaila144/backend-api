@@ -1,0 +1,11 @@
+{
+    "name": "UsersGuard",
+    "alias": "usersguard",
+    "description": "Multi-tenant User Management Module",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\UsersGuard\\Providers\\UsersGuardServiceProvider"
+    ],
+    "files": []
+}
