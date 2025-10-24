@@ -13,7 +13,10 @@
       "Bash(findstr:*)",
       "Bash(php update-password-column.php:*)",
       "Bash(php migrate-password.php:*)",
-      "Bash(php restore-md5-password.php:*)"
+      "Bash(php restore-md5-password.php:*)",
+      "Bash(php test-json.php:*)",
+      "Read(//c/xampp/htdocs/project/modules/users/admin/actions/**)",
+      "Read(//c/xampp/htdocs/project/**)"
     ],
     "deny": [],
     "ask": []

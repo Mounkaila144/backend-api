@@ -1,3 +1,5 @@
 {
-    "UsersGuard": true
+    "UsersGuard": true,
+    "User": true,
+    "Roi": true
 }

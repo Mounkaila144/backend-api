@@ -9,7 +9,7 @@ use Modules\UsersGuard\Http\Controllers\Admin\IndexController;
 | Ces routes utilisent la base de données du tenant
 */
 
-Route::prefix('admin')->middleware(['auth:sanctum', 'tenant'])->group(function () {
+Route::prefix('admin')->middleware(['tenant', 'auth:sanctum'])->group(function () {
     Route::prefix('usersguard')->group(function () {
         Route::get('/', [IndexController::class, 'index']);
     });
