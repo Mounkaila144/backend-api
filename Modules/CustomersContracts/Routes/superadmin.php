@@ -7,7 +7,7 @@ use Modules\CustomersContracts\Http\Controllers\Superadmin\IndexController;
 |--------------------------------------------------------------------------
 | Superadmin Routes (CENTRAL DATABASE)
 |--------------------------------------------------------------------------
-| Ces routes utilisent la base de donnÃ©es centrale
+| Ces routes utilisent la base de données centrale
 */
 
 Route::prefix('api/superadmin')->middleware(['auth:sanctum'])->group(function () {

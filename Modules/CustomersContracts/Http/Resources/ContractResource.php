@@ -87,7 +87,7 @@ class ContractResource extends JsonResource
             'remarks' => $this->remarks,
             'variables' => $this->variables_array ?? json_decode($this->variables, true),
             'is_signed' => $this->is_signed,
-            'status_flag' => $this->status,
+            'status_flag' => $this->getAttribute('status'), // ACTIVE or DELETE
 
             // Products
             'products' => $this->whenLoaded('products', function () {

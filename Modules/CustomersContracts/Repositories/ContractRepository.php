@@ -23,14 +23,18 @@ class ContractRepository
      */
     public function getFilteredContracts(array $filters, int $perPage = 15): LengthAwarePaginator
     {
-        $query = CustomerContract::query()
-            ->with([
+        $query = CustomerContract::query();
+
+        // Optionally load relations based on request
+        if (!empty($filters['with_relations'])) {
+            $query->with([
                 'customer',
                 'status',
                 'installStatus',
                 'adminStatus',
                 'products',
             ]);
+        }
 
         // Apply filters
         $this->applyFilters($query, $filters);

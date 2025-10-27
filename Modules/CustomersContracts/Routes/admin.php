@@ -11,7 +11,7 @@ use Modules\CustomersContracts\Http\Controllers\Admin\IndexController;
 | Ces routes utilisent la base de données du tenant
 */
 
-Route::prefix('api/admin')->middleware(['auth:sanctum', 'tenant'])->group(function () {
+Route::prefix('api/admin')->middleware(['tenant', 'auth:sanctum'])->group(function () {
     Route::prefix('customerscontracts')->name('admin.customerscontracts.')->group(function () {
         // Legacy placeholder routes
         Route::get('/legacy', [IndexController::class, 'index'])->name('legacy.index');

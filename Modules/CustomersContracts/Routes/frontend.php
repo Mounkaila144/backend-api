@@ -7,7 +7,7 @@ use Modules\CustomersContracts\Http\Controllers\Frontend\IndexController;
 |--------------------------------------------------------------------------
 | Frontend Routes (TENANT DATABASE - Public + Protected)
 |--------------------------------------------------------------------------
-| Ces routes utilisent la base de donnÃ©es du tenant
+| Ces routes utilisent la base de données du tenant
 */
 
 Route::prefix('api/frontend')->middleware(['tenant'])->group(function () {
@@ -18,7 +18,7 @@ Route::prefix('api/frontend')->middleware(['tenant'])->group(function () {
 
         // Protected routes
         Route::middleware('auth:sanctum')->group(function () {
-            // Routes authentifiÃ©es ici
+            // Routes authentifiées ici
         });
     });
 });
