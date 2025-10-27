@@ -1,0 +1,11 @@
+{
+    "name": "CustomersContracts",
+    "alias": "customerscontracts",
+    "description": "CustomersContracts module with multi-tenant support",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\\\CustomersContracts\\\\Providers\\\\CustomersContractsServiceProvider"
+    ],
+    "files": []
+}

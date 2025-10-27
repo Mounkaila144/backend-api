@@ -16,7 +16,9 @@
       "Bash(php restore-md5-password.php:*)",
       "Bash(php test-json.php:*)",
       "Read(//c/xampp/htdocs/project/modules/users/admin/actions/**)",
-      "Read(//c/xampp/htdocs/project/**)"
+      "Read(//c/xampp/htdocs/project/**)",
+      "Read(//c/laragon/etc/apache2/sites-enabled/**)",
+      "Read(//c/Users/Mounkaila/PhpstormProjects/icall26/**)"
     ],
     "deny": [],
     "ask": []

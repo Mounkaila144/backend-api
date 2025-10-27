@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace Modules\UsersGuard\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User as SuperadminUser;
@@ -34,60 +34,11 @@ class AuthController extends Controller
     }
 
     /**
-     * Login SUPERADMIN (base centrale)
-     * POST /api/superadmin/auth/login
-     */
-    public function loginSuperadmin(Request $request): JsonResponse
-    {
-        $validated = $request->validate([
-            'username' => 'required|string',
-            'password' => 'required|string',
-        ]);
-
-        // Chercher dans la base CENTRALE
-        $user = SuperadminUser::superadmin()
-            ->active()
-            ->where('username', $validated['username'])
-            ->first();
-
-        if (!$user || !$this->checkPassword($validated['password'], $user->password)) {
-            throw ValidationException::withMessages([
-                'username' => ['Invalid credentials'],
-            ]);
-        }
-
-        // Créer token
-        $token = $user->createToken('superadmin-token', ['role:superadmin'])->plainTextToken;
-
-        // Mettre à jour last login
-        DB::connection('mysql')->table('t_users')
-            ->where('id', $user->id)
-            ->update(['lastlogin' => now()]);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Superadmin login successful',
-            'data' => [
-                'user' => [
-                    'id' => $user->id,
-                    'username' => $user->username,
-                    'email' => $user->email,
-                    'firstname' => $user->firstname,
-                    'lastname' => $user->lastname,
-                    'application' => $user->application,
-                ],
-                'token' => $token,
-                'token_type' => 'Bearer',
-            ],
-        ]);
-    }
-
-    /**
      * Login TENANT (base du site)
      * POST /api/auth/login
      * Header requis: X-Tenant-ID
      */
-    public function loginTenant(Request $request): JsonResponse
+    public function login(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'username' => 'required|string',

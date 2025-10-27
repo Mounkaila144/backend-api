@@ -1,4 +1,4 @@
-<?php
+    <?php
 
 namespace Modules\UsersGuard\Http\Controllers\Admin;
 

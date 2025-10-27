@@ -1,5 +1,8 @@
 {
     "UsersGuard": true,
     "User": true,
-    "Roi": true
+    "Roi": true,
+    "Dashboard": true,
+    "Customer": true,
+    "CustomersContracts": true
 }
