@@ -50,12 +50,12 @@ class ContractResource extends JsonResource
 
             // Status
             'state_id' => $this->state_id,
-            'status' => $this->whenLoaded('status', function () {
+            'contract_status' => $this->whenLoaded('contractStatus', function () {
                 return [
-                    'id' => $this->status->id,
-                    'name' => $this->status->name,
-                    'color' => $this->status->color,
-                    'icon' => $this->status->icon,
+                    'id' => $this->contractStatus->id,
+                    'name' => $this->contractStatus->name,
+                    'color' => $this->contractStatus->color,
+                    'icon' => $this->contractStatus->icon,
                 ];
             }),
 
@@ -96,7 +96,7 @@ class ContractResource extends JsonResource
                         'id' => $product->id,
                         'product_id' => $product->product_id,
                         'details' => $product->details,
-                        'product' => $product->whenLoaded('product'),
+                        'product' => $product->relationLoaded('product') ? $product->product : null,
                     ];
                 });
             }),
@@ -122,7 +122,7 @@ class ContractResource extends JsonResource
                         'type' => $c->type,
                         'user_id' => $c->user_id,
                         'attribution_id' => $c->attribution_id,
-                        'user' => $c->whenLoaded('user'),
+                        'user' => $c->relationLoaded('user') ? $c->user : null,
                     ];
                 });
             }),

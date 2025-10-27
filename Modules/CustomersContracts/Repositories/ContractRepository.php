@@ -29,7 +29,7 @@ class ContractRepository
         if (!empty($filters['with_relations'])) {
             $query->with([
                 'customer',
-                'status',
+                'contractStatus',
                 'installStatus',
                 'adminStatus',
                 'products',
@@ -188,7 +188,7 @@ class ContractRepository
     {
         return CustomerContract::with([
             'customer',
-            'status',
+            'contractStatus',
             'installStatus',
             'adminStatus',
             'products.product',
@@ -281,7 +281,7 @@ class ContractRepository
             'by_status' => CustomerContract::active()
                 ->select('state_id', DB::raw('count(*) as count'))
                 ->groupBy('state_id')
-                ->with('status')
+                ->with('contractStatus')
                 ->get(),
             'by_install_status' => CustomerContract::active()
                 ->select('install_state_id', DB::raw('count(*) as count'))

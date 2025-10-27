@@ -128,9 +128,18 @@ class CustomerContract extends Model
     /**
      * Get the contract status
      */
-    public function status(): BelongsTo
+    public function contractStatus(): BelongsTo
     {
         return $this->belongsTo(CustomerContractStatus::class, 'state_id');
+    }
+
+    /**
+     * Alias for backward compatibility
+     * @deprecated Use contractStatus() instead
+     */
+    public function status(): BelongsTo
+    {
+        return $this->contractStatus();
     }
 
     /**
