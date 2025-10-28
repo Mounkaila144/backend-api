@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\DB;
 use Modules\CustomersContracts\Entities\CustomerContract;
 use Modules\CustomersContracts\Http\Resources\ContractResource;
 use Modules\CustomersContracts\Http\Resources\ContractCollection;
+use Modules\CustomersContracts\Http\Resources\ContractListResource;
+use Modules\CustomersContracts\Http\Resources\ContractListCollection;
 use Modules\CustomersContracts\Http\Requests\StoreContractRequest;
 use Modules\CustomersContracts\Http\Requests\UpdateContractRequest;
 use Modules\CustomersContracts\Repositories\ContractRepository;
@@ -58,9 +60,10 @@ class ContractController extends Controller
             $perPage = $request->input('per_page', 15);
             $contracts = $this->repository->getFilteredContracts($request->all(), $perPage);
 
+            // Use list resource for table display
             return response()->json([
                 'success' => true,
-                'data' => new ContractCollection($contracts),
+                'data' => new ContractListCollection($contracts),
                 'meta' => [
                     'current_page' => $contracts->currentPage(),
                     'last_page' => $contracts->lastPage(),

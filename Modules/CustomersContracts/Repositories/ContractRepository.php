@@ -25,10 +25,14 @@ class ContractRepository
     {
         $query = CustomerContract::query();
 
-        // Optionally load relations based on request
+        // Always load customer with addresses for list display
+        $query->with(['customer.addresses' => function ($query) {
+            $query->where('status', 'ACTIVE')->limit(1);
+        }]);
+
+        // Optionally load additional relations based on request
         if (!empty($filters['with_relations'])) {
             $query->with([
-                'customer',
                 'contractStatus',
                 'installStatus',
                 'adminStatus',
