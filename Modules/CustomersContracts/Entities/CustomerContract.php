@@ -61,12 +61,15 @@ class CustomerContract extends Model
         'sale_2_id',
         'manager_id',
         'assistant_id',
+        'quoted_at',
+        'billing_at',
         'opened_at',
         'opened_at_range_id',
         'sent_at',
         'payment_at',
         'opc_at',
         'opc_range_id',
+        'sav_at_range_id',
         'apf_at',
         'state_id',
         'install_state_id',
@@ -79,9 +82,13 @@ class CustomerContract extends Model
         'status',
         'company_id',
         'installer_user_id',
+        'mensuality',
+        'advance_payment',
     ];
 
     protected $casts = [
+        'quoted_at' => 'date',
+        'billing_at' => 'date',
         'opened_at' => 'date',
         'sent_at' => 'datetime',
         'payment_at' => 'date',
@@ -91,6 +98,24 @@ class CustomerContract extends Model
         'total_price_without_taxe' => 'decimal:2',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
+    ];
+
+    protected $attributes = [
+        'tax_id' => 0,
+        'team_id' => 0,
+        'telepro_id' => 0,
+        'sale_1_id' => 0,
+        'sale_2_id' => 0,
+        'manager_id' => 0,
+        'assistant_id' => 0,
+        'opened_at_range_id' => 1, // Default range ID (foreign key constraint)
+        'sav_at_range_id' => 1, // Default range ID (foreign key constraint)
+        'state_id' => 52, // Default status ID from t_customers_contracts_status (site_theme32)
+        'opc_range_id' => 1, // Default range ID (foreign key constraint)
+        'mensuality' => 0,
+        'advance_payment' => 0,
+        'remarks' => '',
+        'variables' => '',
     ];
 
     /**

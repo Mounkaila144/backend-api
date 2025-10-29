@@ -18,7 +18,10 @@
       "Read(//c/xampp/htdocs/project/modules/users/admin/actions/**)",
       "Read(//c/xampp/htdocs/project/**)",
       "Read(//c/laragon/etc/apache2/sites-enabled/**)",
-      "Read(//c/Users/Mounkaila/PhpstormProjects/icall26/**)"
+      "Read(//c/Users/Mounkaila/PhpstormProjects/icall26/**)",
+      "Bash(dir:*)",
+      "Bash(mysql:*)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []

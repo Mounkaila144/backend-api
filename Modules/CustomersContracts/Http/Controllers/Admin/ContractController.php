@@ -91,12 +91,80 @@ class ContractController extends Controller
         try {
             DB::beginTransaction();
 
-            $contract = $this->repository->create($request->validated());
+            $validatedData = $request->validated();
+
+            // Handle customer creation if customer data is provided
+            if (isset($validatedData['customer'])) {
+                $customerData = $validatedData['customer'];
+
+                // Create or find customer
+                $customer = \Modules\Customer\Entities\Customer::firstOrCreate(
+                    [
+                        'lastname' => $customerData['lastname'],
+                        'firstname' => $customerData['firstname'],
+                        'phone' => $customerData['phone'],
+                    ],
+                    [
+                        'status' => 'ACTIVE',
+                        'union_id' => $customerData['union_id'] ?? 0,
+                    ]
+                );
+
+                // Create address if provided
+                if (isset($customerData['address'])) {
+                    \Modules\Customer\Entities\CustomerAddress::firstOrCreate(
+                        [
+                            'customer_id' => $customer->id,
+                            'address1' => $customerData['address']['address1'],
+                            'postcode' => $customerData['address']['postcode'],
+                            'city' => $customerData['address']['city'],
+                        ],
+                        [
+                            'address2' => $customerData['address']['address2'] ?? '',
+                            'country' => $customerData['address']['country'] ?? 'FR',
+                            'state' => $customerData['address']['state'] ?? '',
+                            'coordinates' => $customerData['address']['coordinates'] ?? '',
+                            'status' => 'ACTIVE',
+                        ]
+                    );
+                }
+
+                // Set customer_id for contract
+                $validatedData['customer_id'] = $customer->id;
+
+                // Remove customer nested data
+                unset($validatedData['customer']);
+            }
+
+            // Generate reference if not provided
+            if (empty($validatedData['reference'])) {
+                $validatedData['reference'] = $this->repository->generateReference();
+            }
+
+            // Set default status if not provided
+            if (empty($validatedData['status'])) {
+                $validatedData['status'] = 'ACTIVE';
+            }
+
+            $contract = $this->repository->create($validatedData);
+
+            // Handle products if provided
+            if (isset($request->products) && is_array($request->products)) {
+                foreach ($request->products as $product) {
+                    $contract->products()->create([
+                        'product_id' => $product['product_id'],
+                        'details' => $product['details'] ?? null,
+                    ]);
+                }
+            }
 
             // Log history
             $this->repository->logHistory($contract, 'Contract created', $request->user());
 
             DB::commit();
+
+            // Reload contract with relations
+            $contract = $this->repository->findWithRelations($contract->id);
 
             return response()->json([
                 'success' => true,
