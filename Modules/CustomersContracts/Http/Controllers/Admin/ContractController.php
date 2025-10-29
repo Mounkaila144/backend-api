@@ -234,11 +234,75 @@ class ContractController extends Controller
                 ], 404);
             }
 
+            $validatedData = $request->validated();
+
+            // Handle customer update if customer data is provided
+            if (isset($validatedData['customer'])) {
+                $customerData = $validatedData['customer'];
+
+                // Update or create customer
+                $customer = \Modules\Customer\Entities\Customer::updateOrCreate(
+                    [
+                        'id' => $contract->customer_id,
+                    ],
+                    [
+                        'lastname' => $customerData['lastname'],
+                        'firstname' => $customerData['firstname'],
+                        'phone' => $customerData['phone'],
+                        'union_id' => $customerData['union_id'] ?? 0,
+                        'status' => 'ACTIVE',
+                    ]
+                );
+
+                // Update address if provided
+                if (isset($customerData['address'])) {
+                    \Modules\Customer\Entities\CustomerAddress::updateOrCreate(
+                        [
+                            'customer_id' => $customer->id,
+                        ],
+                        [
+                            'address1' => $customerData['address']['address1'],
+                            'postcode' => $customerData['address']['postcode'],
+                            'city' => $customerData['address']['city'],
+                            'address2' => $customerData['address']['address2'] ?? '',
+                            'country' => $customerData['address']['country'] ?? 'FR',
+                            'state' => $customerData['address']['state'] ?? '',
+                            'coordinates' => $customerData['address']['coordinates'] ?? '',
+                            'status' => 'ACTIVE',
+                        ]
+                    );
+                }
+
+                // Update customer_id in validated data
+                $validatedData['customer_id'] = $customer->id;
+
+                // Remove customer nested data
+                unset($validatedData['customer']);
+            }
+
             $oldData = $contract->toArray();
-            $contract = $this->repository->update($contract, $request->validated());
+            $contract = $this->repository->update($contract, $validatedData);
+
+            // Handle products update if provided
+            if (isset($request->products)) {
+                // Delete existing products
+                $contract->products()->delete();
+
+                // Create new products
+                if (is_array($request->products)) {
+                    foreach ($request->products as $product) {
+                        if (isset($product['product_id'])) {
+                            $contract->products()->create([
+                                'product_id' => $product['product_id'],
+                                'details' => $product['details'] ?? null,
+                            ]);
+                        }
+                    }
+                }
+            }
 
             // Log changes
-            $changes = array_diff_assoc($request->validated(), $oldData);
+            $changes = array_diff_assoc($validatedData, $oldData);
             if (! empty($changes)) {
                 $this->repository->logHistory(
                     $contract,
@@ -248,6 +312,9 @@ class ContractController extends Controller
             }
 
             DB::commit();
+
+            // Reload contract with relations
+            $contract = $this->repository->findWithRelations($contract->id);
 
             return response()->json([
                 'success' => true,
