@@ -40,12 +40,15 @@ class ContractResource extends JsonResource
             'installer_user_id' => $this->installer_user_id,
 
             // Dates
+            'quoted_at' => $this->quoted_at?->format('Y-m-d'),
+            'billing_at' => $this->billing_at?->format('Y-m-d'),
             'opened_at' => $this->opened_at?->format('Y-m-d'),
             'opened_at_range_id' => $this->opened_at_range_id,
             'sent_at' => $this->sent_at?->format('Y-m-d H:i:s'),
             'payment_at' => $this->payment_at?->format('Y-m-d'),
             'opc_at' => $this->opc_at?->format('Y-m-d H:i:s'),
             'opc_range_id' => $this->opc_range_id,
+            'sav_at_range_id' => $this->sav_at_range_id,
             'apf_at' => $this->apf_at?->format('Y-m-d'),
 
             // Status
@@ -82,6 +85,9 @@ class ContractResource extends JsonResource
             // Financial
             'total_price_with_taxe' => (float) $this->total_price_with_taxe,
             'total_price_without_taxe' => (float) $this->total_price_without_taxe,
+            'mensuality' => (float) $this->mensuality,
+            'advance_payment' => (float) $this->advance_payment,
+            'company_id' => $this->company_id,
 
             // Additional info
             'remarks' => $this->remarks,
