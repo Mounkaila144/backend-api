@@ -4,5 +4,6 @@
     "Roi": true,
     "Dashboard": true,
     "Customer": true,
-    "CustomersContracts": true
+    "CustomersContracts": true,
+    "Site": true
 }

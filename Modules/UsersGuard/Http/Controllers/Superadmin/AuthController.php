@@ -11,9 +11,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
-use function App\Http\Controllers\Api\now;
-use function App\Http\Controllers\Api\response;
-use function App\Http\Controllers\Api\tenancy;
 
 class AuthController extends Controller
 {
@@ -34,6 +31,59 @@ class AuthController extends Controller
 
         // Format inconnu
         return false;
+    }
+
+    /**
+     * Login SUPERADMIN (base centrale)
+     * POST /api/superadmin/auth/login
+     * Pas de header X-Tenant-ID requis
+     */
+    public function login(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'username' => 'required|string',
+            'password' => 'required|string',
+            'application' => 'required|in:superadmin,admin',
+        ]);
+
+        // Chercher dans la base CENTRALE (pas de tenant)
+        $user = SuperadminUser::where('username', $validated['username'])
+            ->where('application', $validated['application'])
+            ->active()
+            ->first();
+
+        if (!$user || !$this->checkPassword($validated['password'], $user->password)) {
+            throw ValidationException::withMessages([
+                'username' => ['Invalid credentials'],
+            ]);
+        }
+
+        // Créer token avec abilities superadmin
+        $token = $user->createToken('superadmin-token', [
+            'role:superadmin',
+        ])->plainTextToken;
+
+        // Mettre à jour last login
+        DB::connection('mysql')->table('t_users')
+            ->where('id', $user->id)
+            ->update(['lastlogin' => now()]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Login successful',
+            'data' => [
+                'user' => [
+                    'id' => $user->id,
+                    'username' => $user->username,
+                    'email' => $user->email,
+                    'firstname' => $user->firstname,
+                    'lastname' => $user->lastname,
+                    'application' => $user->application,
+                ],
+                'token' => $token,
+                'token_type' => 'Bearer',
+            ],
+        ]);
     }
 
     public function me(Request $request): JsonResponse

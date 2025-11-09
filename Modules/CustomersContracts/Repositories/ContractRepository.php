@@ -191,7 +191,9 @@ class ContractRepository
     public function findWithRelations(int $id): ?CustomerContract
     {
         return CustomerContract::with([
-            'customer',
+            'customer.addresses' => function ($query) {
+                $query->where('status', 'ACTIVE')->limit(1);
+            },
             'contractStatus',
             'installStatus',
             'adminStatus',

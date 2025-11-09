@@ -23,7 +23,48 @@ class ContractResource extends JsonResource
 
             // Customer
             'customer_id' => $this->customer_id,
-            'customer' => $this->whenLoaded('customer'),
+            'customer' => $this->whenLoaded('customer', function () {
+                return [
+                    'id' => $this->customer->id,
+                    'company' => $this->customer->company,
+                    'gender' => $this->customer->gender,
+                    'firstname' => $this->customer->firstname,
+                    'lastname' => $this->customer->lastname,
+                    'email' => $this->customer->email,
+                    'phone' => $this->customer->phone,
+                    'mobile' => $this->customer->mobile,
+                    'mobile2' => $this->customer->mobile2,
+                    'phone1' => $this->customer->phone1,
+                    'birthday' => $this->customer->birthday?->format('Y-m-d'),
+                    'union_id' => $this->customer->union_id,
+                    'age' => $this->customer->age,
+                    'salary' => $this->customer->salary,
+                    'occupation' => $this->customer->occupation,
+                    'status' => $this->customer->status,
+                    'created_at' => $this->customer->created_at?->format('Y-m-d\TH:i:s.u\Z'),
+                    'updated_at' => $this->customer->updated_at?->format('Y-m-d\TH:i:s.u\Z'),
+                    'full_name' => $this->customer->full_name,
+                    'display_name' => $this->customer->display_name,
+                    'addresses' => $this->customer->relationLoaded('addresses')
+                        ? $this->customer->addresses->map(function ($address) {
+                            return [
+                                'id' => $address->id,
+                                'address1' => $address->address1,
+                                'address2' => $address->address2,
+                                'postcode' => $address->postcode,
+                                'city' => $address->city,
+                                'state' => $address->state,
+                                'country' => $address->country,
+                                'coordinates' => $address->coordinates,
+                                'lat' => $address->lat,
+                                'lng' => $address->lng,
+                                'status' => $address->status,
+                                'full_address' => $address->full_address,
+                            ];
+                        })
+                        : [],
+                ];
+            }),
 
             // Related IDs
             'meeting_id' => $this->meeting_id,
