@@ -1,11 +1,11 @@
 {
     "name": "Site",
-    "alias": "site",
+    "alias": "user",
     "description": "Site module with multi-tenant support",
     "keywords": [],
     "priority": 0,
     "providers": [
-        "Modules\\\\Site\\\\Providers\\\\SiteServiceProvider"
+        "Modules\\Site\\Providers\\SiteServiceProvider"
     ],
     "files": []
 }

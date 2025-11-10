@@ -43,8 +43,36 @@ class Tenant extends BaseTenant implements TenantWithDatabase
         'site_db_password',
         'site_db_host',
         'site_admin_theme',
+        'site_admin_theme_base',
         'site_frontend_theme',
+        'site_frontend_theme_base',
         'site_available',
+        'site_admin_available',
+        'site_frontend_available',
+        'site_type',
+        'site_master',
+        'site_access_restricted',
+        'site_company',
+        'is_customer',
+        'is_uptodate',
+        'logo',
+        'picture',
+        'banner',
+        'favicon',
+        'price',
+        'site_db_size',
+        'site_size',
+        'last_connection',
+    ];
+
+    /**
+     * Cast des types
+     */
+    protected $casts = [
+        'last_connection' => 'datetime',
+        'price' => 'decimal:2',
+        'site_db_size' => 'integer',
+        'site_size' => 'integer',
     ];
 
     /**
