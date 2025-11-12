@@ -22,20 +22,30 @@ class UserTeamManager extends Pivot
 
     protected $fillable = [
         'manager_id',
+        'manager2_id',
         'user_id',
     ];
 
     protected $casts = [
         'manager_id' => 'integer',
+        'manager2_id' => 'integer',
         'user_id' => 'integer',
     ];
 
     /**
-     * Get the manager
+     * Get the primary manager
      */
     public function manager(): BelongsTo
     {
         return $this->belongsTo(User::class, 'manager_id', 'id');
+    }
+
+    /**
+     * Get the secondary manager
+     */
+    public function secondaryManager(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'manager2_id', 'id');
     }
 
     /**

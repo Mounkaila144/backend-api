@@ -21,16 +21,52 @@ class UserRepository
      */
     public function getPaginated(array $filters = [], int $perPage = 100): LengthAwarePaginator
     {
+        $selects = [
+            't_users.*',
+            // Aggregate functions and subqueries for additional data
+            // Only groups_list is guaranteed to exist
+            DB::raw('(SELECT GROUP_CONCAT(t_groups.name ORDER BY t_groups.name ASC)
+                     FROM t_user_group
+                     LEFT JOIN t_groups ON t_user_group.group_id = t_groups.id
+                     WHERE t_user_group.user_id = t_users.id
+                     AND t_groups.name != "superadmin"
+                     ) as groups_list'),
+        ];
+
+        // Check which tables exist and add corresponding selects
+        $existingTables = $this->getExistingTables();
+
+        if (in_array('t_users_team_users', $existingTables) && in_array('t_users_team', $existingTables)) {
+            $selects[] = DB::raw('(SELECT GROUP_CONCAT(t_users_team.name ORDER BY t_users_team.name ASC)
+                         FROM t_users_team_users
+                         LEFT JOIN t_users_team ON t_users_team_users.team_id = t_users_team.id
+                         WHERE t_users_team_users.user_id = t_users.id
+                         ) as teams_list');
+        }
+
+        if (in_array('t_users_functions', $existingTables) && in_array('t_users_function', $existingTables)) {
+            $selects[] = DB::raw('(SELECT GROUP_CONCAT(t_users_function.name ORDER BY t_users_function.name ASC)
+                         FROM t_users_functions
+                         LEFT JOIN t_users_function ON t_users_functions.function_id = t_users_function.id
+                         WHERE t_users_functions.user_id = t_users.id
+                         ) as functions_list');
+        }
+
+        if (in_array('t_users_profiles', $existingTables) && in_array('t_users_profile', $existingTables)) {
+            $selects[] = DB::raw('(SELECT GROUP_CONCAT(t_users_profile.name ORDER BY t_users_profile.name ASC)
+                         FROM t_users_profiles
+                         LEFT JOIN t_users_profile ON t_users_profiles.profile_id = t_users_profile.id
+                         WHERE t_users_profiles.user_id = t_users.id
+                         ) as profiles_list');
+        }
+
         $query = User::query()
-            ->select([
-                't_users.*',
-                // Aggregate functions and subqueries for additional data
-                DB::raw('(SELECT GROUP_CONCAT(t_groups.name ORDER BY t_groups.name ASC)
-                         FROM t_user_group
-                         LEFT JOIN t_groups ON t_user_group.group_id = t_groups.id
-                         WHERE t_user_group.user_id = t_users.id
-                         AND t_groups.name != "superadmin"
-                         ) as groups_list'),
+            ->select($selects)
+            ->with([
+                'groups:id,name',
+                'creator:id,username,firstname,lastname',
+                'unlocker:id,username,firstname,lastname',
+                'callcenter:id,name',
             ])
             ->where('application', 'admin')
             ->where('username', 'NOT LIKE', 'superadmin%');
@@ -45,6 +81,28 @@ class UserRepository
         $this->applySorting($query, $filters);
 
         return $query->paginate($perPage);
+    }
+
+    /**
+     * Get list of existing tables in the current database
+     *
+     * @return array
+     */
+    protected function getExistingTables(): array
+    {
+        static $tables = null;
+
+        if ($tables === null) {
+            try {
+                $tables = array_map(function ($table) {
+                    return array_values((array) $table)[0];
+                }, DB::select('SHOW TABLES'));
+            } catch (\Exception $e) {
+                $tables = [];
+            }
+        }
+
+        return $tables;
     }
 
     /**
@@ -200,8 +258,42 @@ class UserRepository
      */
     public function findWithRelations(int $id): User
     {
-        return User::with(['groups', 'creator', 'unlocker'])
-            ->findOrFail($id);
+        $with = [
+            'groups:id,name',
+            'creator:id,username,firstname,lastname',
+            'unlocker:id,username,firstname,lastname',
+            'callcenter:id,name',
+        ];
+
+        // Add optional relations if tables exist
+        $existingTables = $this->getExistingTables();
+
+        if (in_array('t_users_team_users', $existingTables) && in_array('t_users_team', $existingTables)) {
+            $with[] = 'teams:id,name';
+            $with[] = 'team:id,name,manager_id';
+        }
+
+        if (in_array('t_users_functions', $existingTables) && in_array('t_users_function', $existingTables)) {
+            $with[] = 'functions:id,name';
+        }
+
+        if (in_array('t_users_profiles', $existingTables) && in_array('t_users_profile', $existingTables)) {
+            $with[] = 'profiles:id,name';
+        }
+
+        if (in_array('t_users_attributions', $existingTables) && in_array('t_users_attribution', $existingTables)) {
+            $with[] = 'attributions:id,name';
+        }
+
+        if (in_array('t_users_team', $existingTables)) {
+            $with[] = 'managedTeams:id,name';
+        }
+
+        if (in_array('t_user_property', $existingTables)) {
+            $with[] = 'properties';
+        }
+
+        return User::with($with)->findOrFail($id);
     }
 
     /**

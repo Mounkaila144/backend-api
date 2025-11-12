@@ -25,12 +25,10 @@ class UserTeam extends Model
     protected $fillable = [
         'name',
         'manager_id',
-        'manager2_id',
     ];
 
     protected $casts = [
         'manager_id' => 'integer',
-        'manager2_id' => 'integer',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
@@ -43,13 +41,6 @@ class UserTeam extends Model
         return $this->belongsTo(User::class, 'manager_id', 'id');
     }
 
-    /**
-     * Get the secondary manager of this team
-     */
-    public function secondaryManager(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'manager2_id', 'id');
-    }
 
     /**
      * Get all users in this team (many-to-many)

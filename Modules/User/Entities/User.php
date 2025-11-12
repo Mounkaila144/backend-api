@@ -3,6 +3,7 @@
 namespace Modules\User\Entities;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -316,6 +317,51 @@ class User extends Model
     }
 
     /**
+     * User profiles (many-to-many)
+     */
+    public function profiles(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            UserProfile::class,
+            't_users_profiles',
+            'user_id',
+            'profile_id'
+        )->using(UserProfiles::class);
+    }
+
+    /**
+     * User validation tokens
+     */
+    public function validationTokens(): HasMany
+    {
+        return $this->hasMany(UserValidationToken::class, 'user_id', 'id');
+    }
+
+    /**
+     * User logout requests
+     */
+    public function logoutRequests(): HasMany
+    {
+        return $this->hasMany(UserLogoutRequest::class, 'user_id', 'id');
+    }
+
+    /**
+     * Callcenter relationship
+     */
+    public function callcenter(): BelongsTo
+    {
+        return $this->belongsTo(Callcenter::class, 'callcenter_id', 'id');
+    }
+
+    /**
+     * Team relationship (direct via team_id)
+     */
+    public function team(): BelongsTo
+    {
+        return $this->belongsTo(UserTeam::class, 'team_id', 'id');
+    }
+
+    /**
      * =========================================================================
      * HELPER METHODS
      * =========================================================================
@@ -390,6 +436,60 @@ class User extends Model
      */
     public function isTeamManager(): bool
     {
-        return $this->managedTeams()->exists() || $this->managedTeamsSecondary()->exists();
+        return $this->managedTeams()->exists();
+    }
+
+    /**
+     * Get user's profile IDs
+     */
+    public function getProfileIds(): array
+    {
+        return $this->profiles()->pluck('t_users_profile.id')->toArray();
+    }
+
+    /**
+     * Get user's profile names
+     */
+    public function getProfileNames(string $lang = 'fr'): array
+    {
+        return $this->profiles()
+            ->with(['translation' => function ($q) use ($lang) {
+                $q->where('lang', $lang);
+            }])
+            ->get()
+            ->map(function ($profile) {
+                return $profile->translated_value;
+            })
+            ->toArray();
+    }
+
+    /**
+     * Check if user has a specific profile
+     */
+    public function hasProfile(int $profileId): bool
+    {
+        return $this->profiles()->where('t_users_profile.id', $profileId)->exists();
+    }
+
+    /**
+     * Get active validation tokens for this user
+     */
+    public function getActiveValidationTokens(string $type = null)
+    {
+        $query = $this->validationTokens()->active();
+
+        if ($type) {
+            $query->type($type);
+        }
+
+        return $query->get();
+    }
+
+    /**
+     * Get pending logout requests for this user
+     */
+    public function getPendingLogoutRequests()
+    {
+        return $this->logoutRequests()->pending()->get();
     }
 }
