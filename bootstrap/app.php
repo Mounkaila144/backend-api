@@ -12,9 +12,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        // Enregistrer l'alias tenant
+        // Enregistrer les alias middleware
         $middleware->alias([
             'tenant' => \App\Http\Middleware\InitializeTenancy::class,
+            'permission' => \App\Http\Middleware\CheckPermission::class,
+            'credential' => \App\Http\Middleware\CheckCredential::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
