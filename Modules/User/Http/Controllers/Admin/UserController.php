@@ -36,6 +36,9 @@ class UserController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        // Permissions are checked by middleware in routes (credential middleware)
+        // No need to check here unless specific business logic is required
+
         // Parse filter parameters
         $filters = $this->parseFilters($request);
 

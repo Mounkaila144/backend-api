@@ -2,6 +2,7 @@
 
 namespace Modules\UsersGuard\Entities;
 
+use App\Traits\HasPermissions;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -13,7 +14,7 @@ use Laravel\Sanctum\HasApiTokens;
  */
 class User extends Authenticatable
 {
-    use HasApiTokens, Notifiable;
+    use HasApiTokens, Notifiable, HasPermissions;
 
     /**
      * Table dans la base TENANT
@@ -71,16 +72,6 @@ class User extends Authenticatable
             't_user_group',
             'user_id',
             'group_id'
-        );
-    }
-
-    public function permissions()
-    {
-        return $this->belongsToMany(
-            Permission::class,
-            't_user_permission',
-            'user_id',
-            'permission_id'
         );
     }
 

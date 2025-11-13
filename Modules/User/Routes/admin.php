@@ -11,16 +11,45 @@ use Modules\User\Http\Controllers\Admin\UserController;
 | Ces routes utilisent la base de données du tenant
 */
 
+// Routes globales admin (authentification + tenant requis)
 Route::prefix('api/admin')->middleware(['tenant', 'auth:sanctum'])->group(function () {
-    // User management routes
+
+    // User management routes - Symfony 1 style credentials
     Route::prefix('users')->name('admin.users.')->group(function () {
-        Route::get('/statistics', [UserController::class, 'statistics'])->name('statistics');
-        Route::get('/', [UserController::class, 'index'])->name('index');
-        Route::post('/', [UserController::class, 'store'])->name('store');
-        Route::get('/{id}', [UserController::class, 'show'])->name('show');
-        Route::put('/{id}', [UserController::class, 'update'])->name('update');
-        Route::patch('/{id}', [UserController::class, 'update'])->name('patch');
-        Route::delete('/{id}', [UserController::class, 'destroy'])->name('destroy');
+
+        // Statistics - accessible par admin, superadmin, ou users avec permission settings_user
+        Route::get('/statistics', [UserController::class, 'statistics'])
+            ->middleware('credential:admin,superadmin,settings_user')
+            ->name('statistics');
+
+        // List users - logique OR: au moins un de ces credentials
+        Route::get('/', [UserController::class, 'index'])
+            ->middleware('credential:admin,superadmin,settings_user_list')
+            ->name('index');
+
+        // Create user - logique OR
+        Route::post('/', [UserController::class, 'store'])
+            ->middleware('credential:admin,superadmin,settings_user_create')
+            ->name('store');
+
+        // View user - logique OR
+        Route::get('/{id}', [UserController::class, 'show'])
+            ->middleware('credential:admin,superadmin,settings_user_view')
+            ->name('show');
+
+        // Update user - logique OR
+        Route::put('/{id}', [UserController::class, 'update'])
+            ->middleware('credential:admin,superadmin,settings_user_edit')
+            ->name('update');
+
+        Route::patch('/{id}', [UserController::class, 'update'])
+            ->middleware('credential:admin,superadmin,settings_user_edit')
+            ->name('patch');
+
+        // Delete user - logique OR
+        Route::delete('/{id}', [UserController::class, 'destroy'])
+            ->middleware('credential:admin,superadmin,settings_user_delete')
+            ->name('destroy');
     });
 
     // Legacy index routes (to be migrated)

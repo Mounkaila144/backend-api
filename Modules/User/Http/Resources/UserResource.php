@@ -170,6 +170,19 @@ class UserResource extends JsonResource
             'team_id' => $this->team_id,
             'creator_id' => $this->creator_id,
             'unlocked_by' => $this->unlocked_by,
+
+            // Permissions and roles (for frontend authorization)
+            'permissions' => $this->when(
+                method_exists($this->resource, 'getPermissionNames'),
+                fn() => $this->getPermissionNames()
+            ),
+            'roles' => $this->whenLoaded('groups', function () {
+                return $this->groups->pluck('name')->toArray();
+            }),
+            'is_superadmin' => $this->when(
+                method_exists($this->resource, 'isSuperadmin'),
+                fn() => $this->isSuperadmin()
+            ),
         ];
     }
 }
