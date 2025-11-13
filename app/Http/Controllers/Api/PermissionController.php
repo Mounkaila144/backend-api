@@ -34,20 +34,22 @@ class PermissionController extends Controller
             'success' => true,
             'data' => [
                 'permissions' => $user->getPermissionNames(),
-                'roles' => $user->groups->pluck('name')->toArray(),
+                'groups' => $user->groups->pluck('name')->toArray(),
                 'is_superadmin' => $user->isSuperadmin(),
                 'is_admin' => $user->isAdmin(),
+                'user_id' => $user->id,
+                'username' => $user->username,
             ],
         ]);
     }
 
     /**
-     * Check if user has specific permission(s)
+     * Check if user has specific credential(s) - Symfony 1 style
      * POST /api/auth/permissions/check
      *
      * Request body:
      * {
-     *   "permissions": "users.edit"  // or ["users.edit", "users.delete"]
+     *   "credentials": "admin"  // or ["admin", "superadmin"] or [["admin", "superadmin"]]
      *   "require_all": false  // optional, default false (OR logic)
      * }
      *
@@ -66,35 +68,36 @@ class PermissionController extends Controller
         }
 
         $validated = $request->validate([
-            'permissions' => 'required',
+            'credentials' => 'required',
             'require_all' => 'nullable|boolean',
         ]);
 
-        $permissions = $validated['permissions'];
+        $credentials = $validated['credentials'];
         $requireAll = $validated['require_all'] ?? false;
 
-        $hasPermission = $user->hasPermission($permissions, $requireAll);
+        // Utiliser hasCredential au lieu de hasPermission (Symfony 1 compatible)
+        $hasCredential = $user->hasCredential($credentials, $requireAll);
 
         return response()->json([
             'success' => true,
             'data' => [
-                'has_permission' => $hasPermission,
-                'checked_permissions' => is_array($permissions) ? $permissions : [$permissions],
+                'has_credential' => $hasCredential,
+                'checked_credentials' => is_array($credentials) ? $credentials : [$credentials],
                 'logic' => $requireAll ? 'AND' : 'OR',
             ],
         ]);
     }
 
     /**
-     * Check multiple permissions at once (batch check)
+     * Check multiple credentials at once (batch check) - Symfony 1 style
      * POST /api/auth/permissions/batch-check
      *
      * Request body:
      * {
      *   "checks": [
-     *     {"name": "can_edit_users", "permissions": ["users.edit"]},
-     *     {"name": "can_delete_users", "permissions": ["users.delete"]},
-     *     {"name": "can_manage_users", "permissions": ["users.edit", "users.delete"], "require_all": true}
+     *     {"name": "can_edit_users", "credentials": ["admin", "users.edit"]},
+     *     {"name": "can_delete_users", "credentials": ["admin", "users.delete"]},
+     *     {"name": "can_manage_users", "credentials": ["users.edit", "users.delete"], "require_all": true}
      *   ]
      * }
      *
@@ -115,17 +118,18 @@ class PermissionController extends Controller
         $validated = $request->validate([
             'checks' => 'required|array',
             'checks.*.name' => 'required|string',
-            'checks.*.permissions' => 'required',
+            'checks.*.credentials' => 'required',
             'checks.*.require_all' => 'nullable|boolean',
         ]);
 
         $results = [];
 
         foreach ($validated['checks'] as $check) {
-            $permissions = $check['permissions'];
+            $credentials = $check['credentials'];
             $requireAll = $check['require_all'] ?? false;
 
-            $results[$check['name']] = $user->hasPermission($permissions, $requireAll);
+            // Utiliser hasCredential au lieu de hasPermission (Symfony 1 compatible)
+            $results[$check['name']] = $user->hasCredential($credentials, $requireAll);
         }
 
         return response()->json([
