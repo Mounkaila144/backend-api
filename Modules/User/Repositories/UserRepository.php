@@ -74,9 +74,6 @@ class UserRepository
         // Apply filters
         $this->applyFilters($query, $filters);
 
-        // Group by user id to avoid duplicates from joins
-        $query->groupBy('t_users.id');
-
         // Apply sorting
         $this->applySorting($query, $filters);
 
