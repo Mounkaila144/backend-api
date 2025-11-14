@@ -116,6 +116,7 @@ return [
          */
         App\Providers\AppServiceProvider::class,
         App\Providers\TenancyServiceProvider::class,  // 🎯 Multi-Tenancy
+        App\Providers\TranslationServiceProvider::class,  // 🌍 Module Translation with Fallback
     ])->toArray(),
     /*
     |--------------------------------------------------------------------------

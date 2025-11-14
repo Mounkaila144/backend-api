@@ -12,6 +12,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // Middleware global pour la détection automatique de la langue
+        $middleware->append(\App\Http\Middleware\SetLocale::class);
+
         // Enregistrer les alias middleware
         $middleware->alias([
             'tenant' => \App\Http\Middleware\InitializeTenancy::class,

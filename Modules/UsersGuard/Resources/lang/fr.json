@@ -1,0 +1,22 @@
+{
+    "User created successfully": "Utilisateur créé avec succès",
+    "User login successfully": "l'utilisateur c'est bien connecter prioriter",
+    "User updated successfully": "Utilisateur mis à jour avec succès",
+    "User deleted successfully": "Utilisateur supprimé avec succès",
+    "User not found": "Utilisateur non trouvé",
+    "User already exists": "L'utilisateur existe déjà",
+    "Invalid credentials": "Identifiants invalides",
+    "Account is disabled": "Le compte est désactivé",
+    "Password changed successfully": "Mot de passe modifié avec succès",
+    "Group created successfully": "Groupe créé avec succès",
+    "Group updated successfully": "Groupe mis à jour avec succès",
+    "Group deleted successfully": "Groupe supprimé avec succès",
+    "Group not found": "Groupe non trouvé",
+    "Permission denied": "Permission refusée",
+    "Permission granted": "Permission accordée",
+    "Permission not found": "Permission non trouvée",
+    "Login successful": "Connexion réussie",
+    "Logout successful": "Déconnexion réussie",
+    "Token has expired": "Le token a expiré",
+    "Invalid token": "Token invalide"
+}

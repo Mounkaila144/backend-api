@@ -21,7 +21,10 @@
       "Read(//c/Users/Mounkaila/PhpstormProjects/icall26/**)",
       "Bash(dir:*)",
       "Bash(mysql:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(php test-translation-debug.php:*)",
+      "Bash(php test-json-translations.php:*)",
+      "Bash(php test-priority.php:*)"
     ],
     "deny": [],
     "ask": []
