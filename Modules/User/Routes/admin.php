@@ -22,6 +22,12 @@ Route::prefix('api/admin')->middleware(['tenant', 'auth:sanctum'])->group(functi
             ->middleware('credential:admin,superadmin,settings_user')
             ->name('statistics');
 
+        // Creation options - get available groups, functions, profiles, etc.
+        // Accessible avec les mêmes permissions que la liste des utilisateurs
+        Route::get('/creation-options', [UserController::class, 'creationOptions'])
+            ->middleware('credential:admin,superadmin,settings_user_list')
+            ->name('creation-options');
+
         // List users - logique OR: au moins un de ces credentials
         Route::get('/', [UserController::class, 'index'])
             ->middleware('credential:admin,superadmin,settings_user_list')
@@ -29,7 +35,7 @@ Route::prefix('api/admin')->middleware(['tenant', 'auth:sanctum'])->group(functi
 
         // Create user - logique OR
         Route::post('/', [UserController::class, 'store'])
-            ->middleware('credential:admin,superadmin,settings_user_create')
+            ->middleware('credential:admin,superadmin,settings_user_list')
             ->name('store');
 
         // View user - logique OR

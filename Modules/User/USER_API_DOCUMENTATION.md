@@ -107,7 +107,7 @@ Get a paginated list of users with all their information.
       "groups_list": "admin,manager",
       "teams_list": "Team A,Team B",
       "functions_list": "Administrator,Manager",
-      "profiles_list": "Admin Profile",
+      "profiles": "Admin Profile",
       "groups": [
         {
           "id": 1,

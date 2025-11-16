@@ -52,7 +52,7 @@ class UserResource extends JsonResource
             'groups_list' => $this->groups_list ?? null,
             'teams_list' => $this->teams_list ?? null,
             'functions_list' => $this->functions_list ?? null,
-            'profiles_list' => $this->profiles_list ?? null,
+            'profiles' => $this->profiles ?? null,
 
             // Groups with permissions
             'groups' => $this->whenLoaded('groups', function () {
@@ -84,16 +84,6 @@ class UserResource extends JsonResource
                     return [
                         'id' => $function->id,
                         'name' => $function->name,
-                    ];
-                });
-            }),
-
-            // Profiles
-            'profiles' => $this->whenLoaded('profiles', function () {
-                return $this->profiles->map(function ($profile) {
-                    return [
-                        'id' => $profile->id,
-                        'name' => $profile->name,
                     ];
                 });
             }),
@@ -174,7 +164,7 @@ class UserResource extends JsonResource
             // Permissions and roles (for frontend authorization)
             'permissions' => $this->when(
                 method_exists($this->resource, 'getPermissionNames'),
-                fn() => $this->getPermissionNames()
+                fn() => count($this->getPermissionNames())
             ),
             'roles' => $this->whenLoaded('groups', function () {
                 return $this->groups->pluck('name')->toArray();

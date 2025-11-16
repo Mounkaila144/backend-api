@@ -83,6 +83,7 @@ class UserController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
+            // Basic user information
             'username' => [
                 'required',
                 'string',
@@ -100,19 +101,41 @@ class UserController extends Controller
             ],
             'firstname' => 'nullable|string|max:16',
             'lastname' => 'nullable|string|max:32',
-            'sex' => 'nullable|in:MR,MS,MRS',
+            'sex' => 'nullable|in:Mr,Ms,Mrs',
             'phone' => 'nullable|string|max:20',
             'mobile' => 'nullable|string|max:20',
             'birthday' => 'nullable|date',
             'is_active' => 'nullable|in:YES,NO',
             'application' => 'required|in:admin,frontend',
+
+            // Foreign keys
+            'callcenter_id' => 'nullable|integer|exists:t_callcenter,id',
+            'company_id' => 'nullable|integer',
+
+            // Assignments (arrays of IDs)
+            'group_ids' => 'nullable|array',
+            'group_ids.*' => 'integer|exists:t_groups,id',
+            'function_ids' => 'nullable|array',
+            'function_ids.*' => 'integer|exists:t_users_function,id',
+            'profile_ids' => 'nullable|array',
+            'profile_ids.*' => 'integer|exists:t_users_profile,id',
+            'team_ids' => 'nullable|array',
+            'team_ids.*' => 'integer|exists:t_users_team,id',
+            'attribution_ids' => 'nullable|array',
+            'attribution_ids.*' => 'integer|exists:t_users_attribution,id',
+            'permission_ids' => 'nullable|array',
+            'permission_ids.*' => 'integer|exists:t_permissions,id',
         ]);
 
         // Hash password
         $validated['password'] = Hash::make($validated['password']);
         $validated['last_password_gen'] = now();
 
-        $user = $this->userRepository->create($validated);
+        // Create user with all assignments
+        $user = $this->userRepository->createWithAssignments($validated);
+
+        // Reload user with all relations for response
+        $user = $this->userRepository->findWithRelations($user->id);
 
         return response()->json([
             'success' => true,
@@ -170,7 +193,7 @@ class UserController extends Controller
             ],
             'firstname' => 'nullable|string|max:16',
             'lastname' => 'nullable|string|max:32',
-            'sex' => 'nullable|in:MR,MS,MRS',
+            'sex' => 'nullable|in:Mr,Ms,Mrs',
             'phone' => 'nullable|string|max:20',
             'mobile' => 'nullable|string|max:20',
             'birthday' => 'nullable|date',
@@ -263,6 +286,22 @@ class UserController extends Controller
         return response()->json([
             'success' => true,
             'data' => $statistics,
+        ]);
+    }
+
+    /**
+     * Get creation options (groups, functions, profiles, teams, etc.)
+     * GET /api/admin/users/creation-options
+     *
+     * @return JsonResponse
+     */
+    public function creationOptions(): JsonResponse
+    {
+        $options = $this->userRepository->getCreationOptions();
+
+        return response()->json([
+            'success' => true,
+            'data' => $options,
         ]);
     }
 }

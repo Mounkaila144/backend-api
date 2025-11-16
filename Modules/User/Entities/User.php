@@ -95,6 +95,7 @@ class User extends Model
         'status' => 'ACTIVE',
         'application' => 'admin',
         'number_of_try' => 0,
+        'callcenter_id' => 0,
     ];
 
     /**

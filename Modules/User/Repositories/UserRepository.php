@@ -53,21 +53,25 @@ class UserRepository
         }
 
         if (in_array('t_users_profiles', $existingTables) && in_array('t_users_profile', $existingTables)) {
-            $selects[] = DB::raw('(SELECT GROUP_CONCAT(t_users_profile.name ORDER BY t_users_profile.name ASC)
+            // Use translated profile names from i18n table (French language)
+            $selects[] = DB::raw('(SELECT GROUP_CONCAT(COALESCE(t_users_profile_i18n.value, t_users_profile.name) ORDER BY COALESCE(t_users_profile_i18n.value, t_users_profile.name) ASC)
                          FROM t_users_profiles
                          LEFT JOIN t_users_profile ON t_users_profiles.profile_id = t_users_profile.id
+                         LEFT JOIN t_users_profile_i18n ON t_users_profile.id = t_users_profile_i18n.profile_id AND t_users_profile_i18n.lang = "fr"
                          WHERE t_users_profiles.user_id = t_users.id
-                         ) as profiles_list');
+                         ) as profiles');
         }
+
+        $with = [
+            'groups:id,name',
+            'creator:id,username,firstname,lastname',
+            'unlocker:id,username,firstname,lastname',
+            'callcenter:id,name',
+        ];
 
         $query = User::query()
             ->select($selects)
-            ->with([
-                'groups:id,name',
-                'creator:id,username,firstname,lastname',
-                'unlocker:id,username,firstname,lastname',
-                'callcenter:id,name',
-            ])
+            ->with($with)
             ->where('application', 'admin')
             ->where('username', 'NOT LIKE', 'superadmin%');
 
@@ -305,6 +309,98 @@ class UserRepository
     }
 
     /**
+     * Create a new user with all assignments (groups, functions, profiles, etc.)
+     *
+     * @param array $data
+     * @return User
+     */
+    public function createWithAssignments(array $data): User
+    {
+        // Extract assignment data
+        $groupIds = $data['group_ids'] ?? [];
+        $functionIds = $data['function_ids'] ?? [];
+        $profileIds = $data['profile_ids'] ?? [];
+        $teamIds = $data['team_ids'] ?? [];
+        $attributionIds = $data['attribution_ids'] ?? [];
+        $permissionIds = $data['permission_ids'] ?? [];
+
+        // Remove assignment data from user data
+        unset($data['group_ids'], $data['function_ids'], $data['profile_ids'], $data['team_ids'], $data['attribution_ids'], $data['permission_ids']);
+
+        // Create the user
+        $user = User::create($data);
+
+        // Assign groups
+        if (!empty($groupIds)) {
+            $user->groups()->attach($groupIds);
+        }
+
+        // Assign functions
+        if (!empty($functionIds)) {
+            $user->functions()->attach($functionIds);
+        }
+
+        // Assign profiles
+        if (!empty($profileIds)) {
+            $user->profiles()->attach($profileIds);
+        }
+
+        // Assign teams (many-to-many)
+        if (!empty($teamIds)) {
+            $user->teams()->attach($teamIds);
+        }
+
+        // Assign attributions
+        if (!empty($attributionIds)) {
+            $user->attributions()->attach($attributionIds);
+        }
+
+        // Assign permissions (exactly as specified by the user)
+        // The frontend is responsible for selecting which permissions to assign
+        if (!empty($permissionIds)) {
+            $insertData = array_map(function ($permissionId) use ($user) {
+                return [
+                    'user_id' => $user->id,
+                    'permission_id' => $permissionId,
+                ];
+            }, array_unique($permissionIds));
+
+            DB::table('t_user_permission')->insert($insertData);
+        }
+
+        return $user;
+    }
+
+    /**
+     * Assign permissions from groups to user
+     *
+     * @param User $user
+     * @param array $groupIds
+     * @return void
+     */
+    protected function assignGroupPermissions(User $user, array $groupIds): void
+    {
+        // Get all permissions from the assigned groups
+        $permissionIds = DB::table('t_group_permission')
+            ->whereIn('group_id', $groupIds)
+            ->pluck('permission_id')
+            ->unique()
+            ->toArray();
+
+        if (!empty($permissionIds)) {
+            // Insert permissions for the user
+            $insertData = array_map(function ($permissionId) use ($user) {
+                return [
+                    'user_id' => $user->id,
+                    'permission_id' => $permissionId,
+                ];
+            }, $permissionIds);
+
+            DB::table('t_user_permission')->insert($insertData);
+        }
+    }
+
+    /**
      * Update user
      *
      * @param int $id
@@ -343,5 +439,136 @@ class UserRepository
             'inactive' => User::where('application', 'admin')->noSuperadmin()->where('is_active', 'NO')->count(),
             'locked' => User::where('application', 'admin')->noSuperadmin()->where('is_locked', 'YES')->count(),
         ];
+    }
+
+    /**
+     * Get creation options for user form
+     * Returns lists of available groups, functions, profiles, teams, etc.
+     *
+     * @return array
+     */
+    public function getCreationOptions(): array
+    {
+        $existingTables = $this->getExistingTables();
+        $options = [];
+
+        // Get groups with their permissions
+        $options['groups'] = DB::table('t_groups')
+            ->where('application', 'admin')
+            ->select('id', 'name')
+            ->orderBy('name')
+            ->get()
+            ->map(function ($group) {
+                // Get permissions for this group
+                $permissionIds = DB::table('t_group_permission')
+                    ->where('group_id', $group->id)
+                    ->pluck('permission_id')
+                    ->toArray();
+
+                return [
+                    'id' => $group->id,
+                    'name' => $group->name,
+                    'permissions_count' => count($permissionIds),
+                    'permission_ids' => $permissionIds,
+                ];
+            })
+            ->toArray();
+
+        // Get all permissions grouped by group_id
+        $permissions = DB::table('t_permissions')
+            ->where('application', 'admin')
+            ->select('id', 'name', 'group_id')
+            ->orderBy('name')
+            ->get();
+
+        $permissionGroups = DB::table('t_permission_group')
+            ->select('id', 'name')
+            ->orderBy('name')
+            ->get()
+            ->map(function ($group) use ($permissions) {
+                $groupPermissions = $permissions->where('group_id', $group->id)->values();
+                return [
+                    'id' => $group->id,
+                    'name' => $group->name,
+                    'permissions' => $groupPermissions->map(function ($perm) {
+                        return [
+                            'id' => $perm->id,
+                            'name' => $perm->name,
+                        ];
+                    })->toArray(),
+                ];
+            })
+            ->toArray();
+
+        $options['permission_groups'] = $permissionGroups;
+
+        // Get functions with translations
+        if (in_array('t_users_function', $existingTables)) {
+            $options['functions'] = DB::table('t_users_function as f')
+                ->leftJoin('t_users_function_i18n as i18n', function ($join) {
+                    $join->on('f.id', '=', 'i18n.function_id')
+                        ->where('i18n.lang', '=', 'fr');
+                })
+                ->select('f.id', DB::raw('COALESCE(i18n.value, f.name) as name'))
+                ->orderBy('name')
+                ->get()
+                ->toArray();
+        } else {
+            $options['functions'] = [];
+        }
+
+        // Get profiles with translations
+        if (in_array('t_users_profile', $existingTables)) {
+            $options['profiles'] = DB::table('t_users_profile as p')
+                ->leftJoin('t_users_profile_i18n as i18n', function ($join) {
+                    $join->on('p.id', '=', 'i18n.profile_id')
+                        ->where('i18n.lang', '=', 'fr');
+                })
+                ->select('p.id', DB::raw('COALESCE(i18n.value, p.name) as name'))
+                ->orderBy('name')
+                ->get()
+                ->toArray();
+        } else {
+            $options['profiles'] = [];
+        }
+
+        // Get teams
+        if (in_array('t_users_team', $existingTables)) {
+            $options['teams'] = DB::table('t_users_team')
+                ->select('id', 'name', 'manager_id')
+                ->orderBy('name')
+                ->get()
+                ->toArray();
+        } else {
+            $options['teams'] = [];
+        }
+
+        // Get attributions with translations
+        if (in_array('t_users_attribution', $existingTables)) {
+            $options['attributions'] = DB::table('t_users_attribution as a')
+                ->leftJoin('t_users_attribution_i18n as i18n', function ($join) {
+                    $join->on('a.id', '=', 'i18n.attribution_id')
+                        ->where('i18n.lang', '=', 'fr');
+                })
+                ->select('a.id', DB::raw('COALESCE(i18n.value, a.name) as name'))
+                ->orderBy('name')
+                ->get()
+                ->toArray();
+        } else {
+            $options['attributions'] = [];
+        }
+
+        // Get callcenters
+        if (in_array('t_callcenter', $existingTables)) {
+            $options['callcenters'] = DB::table('t_callcenter')
+                ->select('id', 'name')
+                ->orderBy('name')
+                ->get()
+                ->toArray();
+        } else {
+            $options['callcenters'] = [];
+        }
+
+        return $options;
     }
 }
