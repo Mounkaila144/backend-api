@@ -115,32 +115,61 @@ class UserRepository
      */
     protected function applyFilters($query, array $filters): void
     {
-        // Search filters
+        // Search filters - supports both string and array format
         if (!empty($filters['search'])) {
             $search = $filters['search'];
 
-            if (!empty($search['query'])) {
-                $query->search($search['query']);
-            }
+            // Support both formats: filter[search]=value OR filter[search][field]=value
+            if (is_string($search)) {
+                // Direct search value: search across multiple fields
+                $searchTerm = $search;
+                $query->where(function ($q) use ($searchTerm) {
+                    $q->where('username', 'LIKE', "%{$searchTerm}%")
+                        ->orWhere('firstname', 'LIKE', "%{$searchTerm}%")
+                        ->orWhere('lastname', 'LIKE', "%{$searchTerm}%")
+                        ->orWhere('email', 'LIKE', "%{$searchTerm}%")
+                        ->orWhere('phone', 'LIKE', "%{$searchTerm}%")
+                        ->orWhere('mobile', 'LIKE', "%{$searchTerm}%");
+                });
+            } elseif (is_array($search)) {
+                // Array format: specific field searches
+                if (!empty($search['query'])) {
+                    $searchTerm = $search['query'];
+                    $query->where(function ($q) use ($searchTerm) {
+                        $q->where('username', 'LIKE', "%{$searchTerm}%")
+                            ->orWhere('firstname', 'LIKE', "%{$searchTerm}%")
+                            ->orWhere('lastname', 'LIKE', "%{$searchTerm}%")
+                            ->orWhere('email', 'LIKE', "%{$searchTerm}%");
+                    });
+                }
 
-            if (!empty($search['username'])) {
-                $query->where('username', 'LIKE', "%{$search['username']}%");
-            }
+                if (!empty($search['username'])) {
+                    $query->where('username', 'LIKE', "%{$search['username']}%");
+                }
 
-            if (!empty($search['firstname'])) {
-                $query->where('firstname', 'LIKE', "%{$search['firstname']}%");
-            }
+                if (!empty($search['firstname'])) {
+                    $query->where('firstname', 'LIKE', "%{$search['firstname']}%");
+                }
 
-            if (!empty($search['lastname'])) {
-                $query->where('lastname', 'LIKE', "%{$search['lastname']}%");
-            }
+                if (!empty($search['lastname'])) {
+                    $query->where('lastname', 'LIKE', "%{$search['lastname']}%");
+                }
 
-            if (!empty($search['email'])) {
-                $query->where('email', 'LIKE', "%{$search['email']}%");
-            }
+                if (!empty($search['email'])) {
+                    $query->where('email', 'LIKE', "%{$search['email']}%");
+                }
 
-            if (isset($search['id'])) {
-                $query->where('t_users.id', $search['id']);
+                if (!empty($search['phone'])) {
+                    $query->where('phone', 'LIKE', "%{$search['phone']}%");
+                }
+
+                if (!empty($search['mobile'])) {
+                    $query->where('mobile', 'LIKE', "%{$search['mobile']}%");
+                }
+
+                if (isset($search['id'])) {
+                    $query->where('t_users.id', $search['id']);
+                }
             }
         }
 
@@ -148,6 +177,7 @@ class UserRepository
         if (!empty($filters['equal'])) {
             $equal = $filters['equal'];
 
+            // Status filters
             if (!empty($equal['is_active'])) {
                 $query->where('is_active', $equal['is_active']);
             }
@@ -164,6 +194,12 @@ class UserRepository
                 $query->where('is_secure_by_code', $equal['is_secure_by_code']);
             }
 
+            if (!empty($equal['sex'])) {
+                $query->where('sex', $equal['sex']);
+            }
+
+            // Relation filters (by ID)
+
             // Group filter
             if (!empty($equal['group_id'])) {
                 $query->whereHas('groups', function ($q) use ($equal) {
@@ -171,9 +207,37 @@ class UserRepository
                 });
             }
 
+            // Team filter (many-to-many)
+            if (!empty($equal['team_id'])) {
+                $query->whereHas('teams', function ($q) use ($equal) {
+                    $q->where('t_users_team.id', $equal['team_id']);
+                });
+            }
+
+            // Function filter
+            if (!empty($equal['function_id'])) {
+                $query->whereHas('functions', function ($q) use ($equal) {
+                    $q->where('t_users_function.id', $equal['function_id']);
+                });
+            }
+
+            // Profile filter
+            if (!empty($equal['profile_id'])) {
+                $query->whereHas('profiles', function ($q) use ($equal) {
+                    $q->where('t_users_profile.id', $equal['profile_id']);
+                });
+            }
+
+            // Attribution filter
+            if (!empty($equal['attribution_id'])) {
+                $query->whereHas('attributions', function ($q) use ($equal) {
+                    $q->where('t_users_attribution.id', $equal['attribution_id']);
+                });
+            }
+
             // Creator filter
             if (isset($equal['creator_id'])) {
-                if ($equal['creator_id'] === 'IS_NULL') {
+                if ($equal['creator_id'] === 'IS_NULL' || $equal['creator_id'] === '') {
                     $query->whereNull('creator_id');
                 } else {
                     $query->where('creator_id', $equal['creator_id']);
@@ -182,7 +246,7 @@ class UserRepository
 
             // Unlocked by filter
             if (isset($equal['unlocked_by'])) {
-                if ($equal['unlocked_by'] === 'IS_NULL') {
+                if ($equal['unlocked_by'] === 'IS_NULL' || $equal['unlocked_by'] === '') {
                     $query->whereNull('unlocked_by');
                 } else {
                     $query->where('unlocked_by', $equal['unlocked_by']);
@@ -191,7 +255,7 @@ class UserRepository
 
             // Company filter
             if (isset($equal['company_id'])) {
-                if ($equal['company_id'] === '') {
+                if ($equal['company_id'] === 'IS_NULL' || $equal['company_id'] === '') {
                     $query->whereNull('company_id');
                 } else {
                     $query->where('company_id', $equal['company_id']);
@@ -200,10 +264,27 @@ class UserRepository
 
             // Callcenter filter
             if (isset($equal['callcenter_id'])) {
-                if ($equal['callcenter_id'] === '') {
+                if ($equal['callcenter_id'] === 'IS_NULL' || $equal['callcenter_id'] === '') {
                     $query->whereNull('callcenter_id');
                 } else {
                     $query->where('callcenter_id', $equal['callcenter_id']);
+                }
+            }
+        }
+
+        // LIKE filters - flexible column-based search
+        if (!empty($filters['like'])) {
+            $like = $filters['like'];
+
+            // Support LIKE on any column
+            $allowedColumns = [
+                'username', 'firstname', 'lastname', 'email', 'phone', 'mobile',
+                'sex', 'application', 'status', 'is_active', 'is_locked'
+            ];
+
+            foreach ($like as $column => $value) {
+                if (in_array($column, $allowedColumns) && !empty($value)) {
+                    $query->where($column, 'LIKE', "%{$value}%");
                 }
             }
         }

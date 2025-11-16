@@ -285,6 +285,11 @@ class UserController extends Controller
             $filters['equal'] = $filter['equal'];
         }
 
+        // LIKE filters
+        if (!empty($filter['like'])) {
+            $filters['like'] = $filter['like'];
+        }
+
         // Order filters
         if (!empty($filter['order'])) {
             $filters['order'] = $filter['order'];
