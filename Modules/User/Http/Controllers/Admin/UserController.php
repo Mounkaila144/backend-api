@@ -172,6 +172,7 @@ class UserController extends Controller
     public function update(Request $request, int $id): JsonResponse
     {
         $validated = $request->validate([
+            // Basic user information
             'username' => [
                 'sometimes',
                 'required',
@@ -201,6 +202,26 @@ class UserController extends Controller
             'is_locked' => 'nullable|in:YES,NO',
             'is_secure_by_code' => 'nullable|in:YES,NO',
             'status' => 'nullable|in:ACTIVE,DELETE',
+            'application' => 'sometimes|in:admin,frontend',
+
+            // Foreign keys
+            'callcenter_id' => 'nullable|integer|exists:t_callcenter,id',
+            'team_id' => 'nullable|integer|exists:t_users_team,id',
+            'company_id' => 'nullable|integer',
+
+            // Assignments (arrays of IDs)
+            'group_ids' => 'nullable|array',
+            'group_ids.*' => 'integer|exists:t_groups,id',
+            'function_ids' => 'nullable|array',
+            'function_ids.*' => 'integer|exists:t_users_function,id',
+            'profile_ids' => 'nullable|array',
+            'profile_ids.*' => 'integer|exists:t_users_profile,id',
+            'team_ids' => 'nullable|array',
+            'team_ids.*' => 'integer|exists:t_users_team,id',
+            'attribution_ids' => 'nullable|array',
+            'attribution_ids.*' => 'integer|exists:t_users_attribution,id',
+            'permission_ids' => 'nullable|array',
+            'permission_ids.*' => 'integer|exists:t_permissions,id',
         ]);
 
         // Hash password if provided
@@ -211,7 +232,11 @@ class UserController extends Controller
             unset($validated['password']);
         }
 
-        $user = $this->userRepository->update($id, $validated);
+        // Update user with all assignments
+        $user = $this->userRepository->updateWithAssignments($id, $validated);
+
+        // Reload user with all relations for response
+        $user = $this->userRepository->findWithRelations($user->id);
 
         return response()->json([
             'success' => true,

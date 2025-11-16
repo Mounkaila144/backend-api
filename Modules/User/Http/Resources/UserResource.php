@@ -163,8 +163,29 @@ class UserResource extends JsonResource
 
             // Permissions and roles (for frontend authorization)
             'permissions' => $this->when(
-                method_exists($this->resource, 'getPermissionNames'),
-                fn() => count($this->getPermissionNames())
+                method_exists($this->resource, 'getAllPermissions'),
+                function () {
+                    // Check if permissions relation was loaded BEFORE calling getAllPermissions()
+                    // because getAllPermissions() auto-loads the relation
+                    $shouldReturnDetails = $this->relationLoaded('permissions');
+
+                    $allPermissions = $this->getAllPermissions();
+
+                    // If permissions relation was pre-loaded, return detailed permissions
+                    // (used in show/detail view)
+                    if ($shouldReturnDetails) {
+                        return $allPermissions->map(function ($permission) {
+                            return [
+                                'id' => $permission->id,
+                                'name' => $permission->name,
+                                'group_id' => $permission->group_id ?? null,
+                            ];
+                        })->values()->toArray();
+                    }
+
+                    // Otherwise return just the count (used in list/index view)
+                    return $allPermissions->count();
+                }
             ),
             'roles' => $this->whenLoaded('groups', function () {
                 return $this->groups->pluck('name')->toArray();

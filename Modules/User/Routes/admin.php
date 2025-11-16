@@ -40,21 +40,21 @@ Route::prefix('api/admin')->middleware(['tenant', 'auth:sanctum'])->group(functi
 
         // View user - logique OR
         Route::get('/{id}', [UserController::class, 'show'])
-            ->middleware('credential:admin,superadmin,settings_user_view')
+            ->middleware('credential:admin,superadmin,settings_user_list')
             ->name('show');
 
         // Update user - logique OR
         Route::put('/{id}', [UserController::class, 'update'])
-            ->middleware('credential:admin,superadmin,settings_user_edit')
+            ->middleware('credential:admin,superadmin,settings_user_list')
             ->name('update');
 
         Route::patch('/{id}', [UserController::class, 'update'])
-            ->middleware('credential:admin,superadmin,settings_user_edit')
+            ->middleware('credential:admin,superadmin,settings_user_list')
             ->name('patch');
 
         // Delete user - logique OR
         Route::delete('/{id}', [UserController::class, 'destroy'])
-            ->middleware('credential:admin,superadmin,settings_user_delete')
+            ->middleware('credential:admin,superadmin,settings_user_list')
             ->name('destroy');
     });
 

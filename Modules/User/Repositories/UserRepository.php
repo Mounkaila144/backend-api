@@ -264,6 +264,7 @@ class UserRepository
             'creator:id,username,firstname,lastname',
             'unlocker:id,username,firstname,lastname',
             'callcenter:id,name',
+            'permissions:id,name,group_id',  // Load user's direct permissions
         ];
 
         // Add optional relations if tables exist
@@ -411,6 +412,79 @@ class UserRepository
     {
         $user = User::findOrFail($id);
         $user->update($data);
+        return $user->fresh();
+    }
+
+    /**
+     * Update user with all assignments (groups, functions, profiles, etc.)
+     *
+     * @param int $id
+     * @param array $data
+     * @return User
+     */
+    public function updateWithAssignments(int $id, array $data): User
+    {
+        // Extract assignment data
+        $groupIds = $data['group_ids'] ?? null;
+        $functionIds = $data['function_ids'] ?? null;
+        $profileIds = $data['profile_ids'] ?? null;
+        $teamIds = $data['team_ids'] ?? null;
+        $attributionIds = $data['attribution_ids'] ?? null;
+        $permissionIds = $data['permission_ids'] ?? null;
+
+        // Remove assignment data from user data
+        unset($data['group_ids'], $data['function_ids'], $data['profile_ids'], $data['team_ids'], $data['attribution_ids'], $data['permission_ids']);
+
+        // Update the user basic information
+        $user = User::findOrFail($id);
+        $user->update($data);
+
+        // Sync groups (replace existing)
+        if ($groupIds !== null) {
+            $user->groups()->sync($groupIds);
+        }
+
+        // Sync functions (replace existing)
+        if ($functionIds !== null) {
+            $user->functions()->sync($functionIds);
+        }
+
+        // Sync profiles (replace existing)
+        if ($profileIds !== null) {
+            $user->profiles()->sync($profileIds);
+        }
+
+        // Sync teams (replace existing)
+        if ($teamIds !== null) {
+            $user->teams()->sync($teamIds);
+        }
+
+        // Sync attributions (replace existing)
+        if ($attributionIds !== null) {
+            $user->attributions()->sync($attributionIds);
+        }
+
+        // Sync permissions (replace existing)
+        // The frontend is responsible for selecting which permissions to assign
+        if ($permissionIds !== null) {
+            // Delete all existing permissions for this user
+            DB::table('t_user_permission')
+                ->where('user_id', $user->id)
+                ->delete();
+
+            // Insert new permissions
+            if (!empty($permissionIds)) {
+                $insertData = array_map(function ($permissionId) use ($user) {
+                    return [
+                        'user_id' => $user->id,
+                        'permission_id' => $permissionId,
+                    ];
+                }, array_unique($permissionIds));
+
+                DB::table('t_user_permission')->insert($insertData);
+            }
+        }
+
         return $user->fresh();
     }
 
