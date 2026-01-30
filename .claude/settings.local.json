@@ -24,9 +24,21 @@
       "Bash(curl:*)",
       "Bash(php test-translation-debug.php:*)",
       "Bash(php test-json-translations.php:*)",
-      "Bash(php test-priority.php:*)"
+      "Bash(php test-priority.php:*)",
+      "Bash(if not exist \"C:\\\\laragon\\\\www\\\\backend-api\\\\_bmad-output\\\\planning-artifacts\" mkdir \"C:\\\\laragon\\\\www\\\\backend-api\\\\_bmad-output\\\\planning-artifacts\")",
+      "mcp__chrome-devtools__take_snapshot",
+      "mcp__chrome-devtools__navigate_page",
+      "mcp__chrome-devtools__wait_for",
+      "mcp__chrome-devtools__click"
     ],
-    "deny": [],
-    "ask": []
+    "deny": []
+  },
+  "mcpServers": {
+    "chrome-devtools": {
+      "command": "npx",
+      "args": [
+        "@anthropic/claude-mcp-devtools@latest"
+      ]
+    }
   }
 }

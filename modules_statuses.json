@@ -5,5 +5,6 @@
     "Dashboard": true,
     "Customer": true,
     "CustomersContracts": true,
-    "Site": true
+    "Site": true,
+    "Superadmin": true
 }

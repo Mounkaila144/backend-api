@@ -229,10 +229,48 @@ class SiteRepository
     public function testConnection(Tenant $site): array
     {
         try {
+            $port = $site->site_db_port ?? 3306;
+            $dsn = "mysql:host={$site->site_db_host};port={$port};dbname={$site->site_db_name}";
+
+            $options = [
+                \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION,
+                \PDO::ATTR_TIMEOUT => 10, // Timeout de 10 secondes
+            ];
+
+            // Configuration SSL si activée
+            if ($site->site_db_ssl_enabled === 'YES') {
+                $sslMode = $site->site_db_ssl_mode ?? 'REQUIRED';
+
+                // Vérification du certificat serveur
+                if (in_array($sslMode, ['VERIFY_CA', 'VERIFY_IDENTITY'])) {
+                    $options[\PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = true;
+                } else {
+                    $options[\PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
+                }
+
+                // Certificat CA
+                if (!empty($site->site_db_ssl_ca)) {
+                    // Si c'est un chemin de fichier existant
+                    if (file_exists($site->site_db_ssl_ca)) {
+                        $options[\PDO::MYSQL_ATTR_SSL_CA] = $site->site_db_ssl_ca;
+                    } else {
+                        // Si c'est le contenu du certificat, on le sauvegarde temporairement
+                        $tempCaFile = storage_path('app/ssl/tenant_' . $site->site_id . '_ca.pem');
+                        $sslDir = dirname($tempCaFile);
+                        if (!is_dir($sslDir)) {
+                            mkdir($sslDir, 0755, true);
+                        }
+                        file_put_contents($tempCaFile, $site->site_db_ssl_ca);
+                        $options[\PDO::MYSQL_ATTR_SSL_CA] = $tempCaFile;
+                    }
+                }
+            }
+
             $pdo = new \PDO(
-                "mysql:host={$site->site_db_host};dbname={$site->site_db_name}",
+                $dsn,
                 $site->site_db_login,
-                $site->site_db_password
+                $site->site_db_password,
+                $options
             );
 
             // Compter les tables
@@ -250,6 +288,8 @@ class SiteRepository
                 'success' => true,
                 'database' => $site->site_db_name,
                 'host' => $site->site_db_host,
+                'port' => $port,
+                'ssl_enabled' => $site->site_db_ssl_enabled === 'YES',
                 'tables_count' => count($tables),
                 'users_count' => $usersCount,
                 'tables' => $tables,
@@ -258,6 +298,9 @@ class SiteRepository
             return [
                 'success' => false,
                 'error' => $e->getMessage(),
+                'host' => $site->site_db_host,
+                'port' => $site->site_db_port ?? 3306,
+                'ssl_enabled' => $site->site_db_ssl_enabled === 'YES',
             ];
         }
     }
@@ -339,17 +382,48 @@ class SiteRepository
     protected function setupTenantTables(Tenant $site): void
     {
         // Configuration temporaire pour se connecter au tenant
-        config([
-            'database.connections.temp_tenant' => [
-                'driver' => 'mysql',
-                'host' => $site->site_db_host,
-                'database' => $site->site_db_name,
-                'username' => $site->site_db_login,
-                'password' => $site->site_db_password,
-                'charset' => 'utf8mb4',
-                'collation' => 'utf8mb4_unicode_ci',
-            ],
-        ]);
+        $config = [
+            'driver' => 'mysql',
+            'host' => $site->site_db_host,
+            'port' => $site->site_db_port ?? 3306,
+            'database' => $site->site_db_name,
+            'username' => $site->site_db_login,
+            'password' => $site->site_db_password,
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+        ];
+
+        // Configuration SSL si activée
+        if ($site->site_db_ssl_enabled === 'YES') {
+            $sslOptions = [];
+            $sslMode = $site->site_db_ssl_mode ?? 'REQUIRED';
+
+            if (in_array($sslMode, ['VERIFY_CA', 'VERIFY_IDENTITY'])) {
+                $sslOptions[\PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = true;
+            } else {
+                $sslOptions[\PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
+            }
+
+            if (!empty($site->site_db_ssl_ca)) {
+                if (file_exists($site->site_db_ssl_ca)) {
+                    $sslOptions[\PDO::MYSQL_ATTR_SSL_CA] = $site->site_db_ssl_ca;
+                } else {
+                    $tempCaFile = storage_path('app/ssl/tenant_' . $site->site_id . '_ca.pem');
+                    $sslDir = dirname($tempCaFile);
+                    if (!is_dir($sslDir)) {
+                        mkdir($sslDir, 0755, true);
+                    }
+                    file_put_contents($tempCaFile, $site->site_db_ssl_ca);
+                    $sslOptions[\PDO::MYSQL_ATTR_SSL_CA] = $tempCaFile;
+                }
+            }
+
+            if (!empty($sslOptions)) {
+                $config['options'] = $sslOptions;
+            }
+        }
+
+        config(['database.connections.temp_tenant' => $config]);
 
         DB::purge('temp_tenant');
 

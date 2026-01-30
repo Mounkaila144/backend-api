@@ -23,9 +23,15 @@ class SiteResource extends JsonResource
             'database' => [
                 'name' => $this->site_db_name,
                 'host' => $this->site_db_host,
+                'port' => $this->site_db_port ?? 3306,
                 'login' => $this->site_db_login,
                 'password' => $this->site_db_password,
                 'size' => $this->site_db_size,
+                'ssl' => [
+                    'enabled' => $this->site_db_ssl_enabled === 'YES',
+                    'mode' => $this->site_db_ssl_mode ?? 'PREFERRED',
+                    'ca' => $this->site_db_ssl_ca,
+                ],
             ],
             'themes' => [
                 'admin' => [

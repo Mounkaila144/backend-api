@@ -1,0 +1,11 @@
+{
+    "name": "Superadmin",
+    "alias": "superadmin",
+    "description": "Module SuperAdmin pour la gestion des modules et services tenants",
+    "keywords": ["superadmin", "multi-tenant", "module-management"],
+    "priority": 0,
+    "providers": [
+        "Modules\\Superadmin\\Providers\\SuperadminServiceProvider"
+    ],
+    "files": []
+}
