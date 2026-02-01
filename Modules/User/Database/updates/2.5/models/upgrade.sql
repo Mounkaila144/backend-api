@@ -1,0 +1,1 @@
+ALTER TABLE `t_users` ADD `is_secure_by_code` enum('YES','NO') COLLATE utf8_bin NOT NULL DEFAULT 'NO' AFTER `is_guess`;

@@ -162,18 +162,15 @@ class UserResource extends JsonResource
             'unlocked_by' => $this->unlocked_by,
 
             // Permissions and roles (for frontend authorization)
+            // PERFORMANCE: Only load full permissions in detail view (when 'permissions' relation is pre-loaded)
+            // In list view, return null to avoid N+1 queries - le frontend n'a pas besoin des permissions en liste
             'permissions' => $this->when(
-                method_exists($this->resource, 'getAllPermissions'),
+                $this->relationLoaded('permissions'),
                 function () {
-                    // Check if permissions relation was loaded BEFORE calling getAllPermissions()
-                    // because getAllPermissions() auto-loads the relation
-                    $shouldReturnDetails = $this->relationLoaded('permissions');
+                    // Detail view only: load full permissions
+                    if (method_exists($this->resource, 'getAllPermissions')) {
+                        $allPermissions = $this->getAllPermissions();
 
-                    $allPermissions = $this->getAllPermissions();
-
-                    // If permissions relation was pre-loaded, return detailed permissions
-                    // (used in show/detail view)
-                    if ($shouldReturnDetails) {
                         return $allPermissions->map(function ($permission) {
                             return [
                                 'id' => $permission->id,
@@ -182,17 +179,16 @@ class UserResource extends JsonResource
                             ];
                         })->values()->toArray();
                     }
-
-                    // Otherwise return just the count (used in list/index view)
-                    return $allPermissions->count();
+                    return [];
                 }
             ),
             'roles' => $this->whenLoaded('groups', function () {
                 return $this->groups->pluck('name')->toArray();
             }),
+            // PERFORMANCE: Check superadmin only from loaded groups to avoid extra query
             'is_superadmin' => $this->when(
-                method_exists($this->resource, 'isSuperadmin'),
-                fn() => $this->isSuperadmin()
+                $this->relationLoaded('groups'),
+                fn() => $this->groups->contains('name', 'superadmin')
             ),
         ];
     }

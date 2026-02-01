@@ -15,6 +15,9 @@ class InitializeTenancy
      */
     public function handle(Request $request, Closure $next): Response
     {
+        $timings = [];
+        $start = microtime(true);
+
         // Option 1: Identifier par header X-Tenant-ID (recommandé pour API)
         if ($request->hasHeader('X-Tenant-ID')) {
             $tenantId = $request->header('X-Tenant-ID');
@@ -28,6 +31,7 @@ class InitializeTenancy
                 ->where('site_available', 'YES')
                 ->first();
         }
+        $timings['tenant_lookup'] = round((microtime(true) - $start) * 1000, 2);
 
         // Vérifier si le tenant existe
         if (!$tenant) {
@@ -39,7 +43,12 @@ class InitializeTenancy
         }
 
         // Initialiser le contexte tenant
+        $initStart = microtime(true);
         tenancy()->initialize($tenant);
+        $timings['tenancy_initialize'] = round((microtime(true) - $initStart) * 1000, 2);
+
+        // Store timings for debugging
+        $_SERVER['TENANCY_TIMINGS'] = $timings;
 
         // Exécuter la requête
         $response = $next($request);

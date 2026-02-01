@@ -24,38 +24,27 @@ class S3HealthChecker implements HealthCheckerInterface
                 );
             }
 
-            // Créer un client S3 temporaire
-            $client = new S3Client([
-                'version' => 'latest',
-                'region' => $config['region'] ?? 'us-east-1',
-                'credentials' => [
-                    'key' => $config['access_key'],
-                    'secret' => $config['secret_key'],
-                ],
-                'endpoint' => $config['endpoint'] ?? null,
-                'use_path_style_endpoint' => $config['use_path_style'] ?? false,
-            ]);
-
+            $client = $this->createClient($config);
             $bucket = $config['bucket'];
 
-            // Test 1: List bucket (vérifie credentials + accès)
-            $client->headBucket(['Bucket' => $bucket]);
+            // Test avec put/get/delete (compatible R2 et S3)
+            // Note: headBucket retourne 403 sur Cloudflare R2
+            $testKey = '.health-check-' . uniqid();
 
-            // Test 2: Write test file
-            $testKey = '.health-check-'.time();
+            // Test 1: Write test file
             $client->putObject([
                 'Bucket' => $bucket,
                 'Key' => $testKey,
                 'Body' => 'health-check',
             ]);
 
-            // Test 3: Read test file
+            // Test 2: Read test file
             $client->getObject([
                 'Bucket' => $bucket,
                 'Key' => $testKey,
             ]);
 
-            // Test 4: Delete test file
+            // Test 3: Delete test file
             $client->deleteObject([
                 'Bucket' => $bucket,
                 'Key' => $testKey,
@@ -69,7 +58,7 @@ class S3HealthChecker implements HealthCheckerInterface
                     'bucket' => $bucket,
                     'region' => $config['region'] ?? 'us-east-1',
                     'endpoint' => $config['endpoint'] ?? 'AWS S3',
-                    'permissions' => ['list', 'read', 'write', 'delete'],
+                    'permissions' => ['read', 'write', 'delete'],
                 ]
             );
 
@@ -77,7 +66,7 @@ class S3HealthChecker implements HealthCheckerInterface
             return new HealthCheckResult(
                 service: $this->serviceName,
                 healthy: false,
-                message: 'S3 connection failed: '.$e->getAwsErrorMessage(),
+                message: 'S3 connection failed: ' . $e->getAwsErrorMessage(),
                 details: [
                     'error_code' => $e->getAwsErrorCode(),
                 ]
@@ -86,7 +75,7 @@ class S3HealthChecker implements HealthCheckerInterface
             return new HealthCheckResult(
                 service: $this->serviceName,
                 healthy: false,
-                message: 'S3 connection failed: '.$e->getMessage(),
+                message: 'S3 connection failed: ' . $e->getMessage(),
                 details: []
             );
         }
@@ -164,6 +153,9 @@ class S3HealthChecker implements HealthCheckerInterface
 
     protected function createClient(array $config): S3Client
     {
+        // Convertir use_path_style en booléen (peut être string "1", "true", ou bool)
+        $usePathStyle = filter_var($config['use_path_style'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
         return new S3Client([
             'version' => 'latest',
             'region' => $config['region'] ?? 'us-east-1',
@@ -172,7 +164,7 @@ class S3HealthChecker implements HealthCheckerInterface
                 'secret' => $config['secret_key'],
             ],
             'endpoint' => $config['endpoint'] ?? null,
-            'use_path_style_endpoint' => $config['use_path_style'] ?? false,
+            'use_path_style_endpoint' => $usePathStyle,
         ]);
     }
 

@@ -6,12 +6,9 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Log;
 use Modules\Superadmin\Http\Requests\UpdateMeilisearchConfigRequest;
-use Modules\Superadmin\Http\Requests\UpdateRedisCacheConfigRequest;
-use Modules\Superadmin\Http\Requests\UpdateRedisQueueConfigRequest;
 use Modules\Superadmin\Http\Requests\UpdateResendConfigRequest;
 use Modules\Superadmin\Http\Requests\UpdateS3ConfigRequest;
 use Modules\Superadmin\Services\Checkers\MeilisearchHealthChecker;
-use Modules\Superadmin\Services\Checkers\RedisHealthChecker;
 use Modules\Superadmin\Services\Checkers\ResendHealthChecker;
 use Modules\Superadmin\Services\Checkers\S3HealthChecker;
 use Modules\Superadmin\Services\ServiceConfigManager;
@@ -53,130 +50,38 @@ class ServiceConfigController extends Controller
     }
 
     /**
-     * POST /api/superadmin/config/s3/test
+     * GET /api/superadmin/config/s3/test
+     * Teste la connexion S3 avec la config sauvegardée
      */
-    public function testS3Connection(UpdateS3ConfigRequest $request): JsonResponse
+    public function testS3Connection(): JsonResponse
     {
-        // Tester avec la config fournie (pas encore sauvegardée)
-        $config = $request->validated();
+        // Utiliser uniquement la config sauvegardée
+        $config = $this->configManager->get('s3');
+
+        if (!$config) {
+            return response()->json([
+                'data' => [
+                    'service' => 's3',
+                    'status' => 'unhealthy',
+                    'healthy' => false,
+                    'message' => 'No S3 configuration found. Please save configuration first.',
+                    'details' => [],
+                    'latencyMs' => null,
+                    'checkedAt' => now()->toIso8601String(),
+                ],
+            ]);
+        }
+
         $result = $this->s3Checker->check($config);
 
         // Audit trail
         Log::channel('superadmin')->info('Service s3 connection test', [
-                'action' => 'service.connection.tested',
-                'service' => 's3',
-                'result' => $result->healthy ? 'success' : 'failed',
-                'message' => $result->message,
-                'user_id' => auth()->id(),
-            ]);
-
-        return response()->json([
-            'data' => $result->toArray(),
+            'action' => 'service.connection.tested',
+            'service' => 's3',
+            'result' => $result->healthy ? 'success' : 'failed',
+            'message' => $result->message,
+            'user_id' => auth()->id(),
         ]);
-    }
-
-    /**
-     * GET /api/superadmin/config/redis-cache
-     */
-    public function getRedisCacheConfig(): JsonResponse
-    {
-        $config = $this->configManager->getForDisplay('redis-cache');
-
-        return response()->json([
-            'data' => $config,
-            'schema' => $this->configManager->getServiceSchema('redis-cache'),
-        ]);
-    }
-
-    /**
-     * PUT /api/superadmin/config/redis-cache
-     */
-    public function updateRedisCacheConfig(UpdateRedisCacheConfigRequest $request): JsonResponse
-    {
-        $serviceConfig = $this->configManager->save('redis-cache', $request->validated());
-
-        return response()->json([
-            'message' => 'Redis cache configuration saved',
-            'data' => $this->configManager->getForDisplay('redis-cache'),
-        ]);
-    }
-
-    /**
-     * POST /api/superadmin/config/redis-cache/test
-     */
-    public function testRedisCacheConnection(UpdateRedisCacheConfigRequest $request): JsonResponse
-    {
-        $config = $request->validated();
-
-        // Fusionner avec la config enregistrée pour obtenir les valeurs manquantes (comme le password)
-        $savedConfig = $this->configManager->get('redis-cache') ?? [];
-        $config = array_merge($savedConfig, array_filter($config, fn($value) => $value !== null && $value !== ''));
-
-        $checker = RedisHealthChecker::forCache();
-        $result = $checker->check($config);
-
-        // Audit trail
-        Log::channel('superadmin')->info('Service redis-cache connection test', [
-                'action' => 'service.connection.tested',
-                'service' => 'redis-cache',
-                'result' => $result->healthy ? 'success' : 'failed',
-                'message' => $result->message,
-                'user_id' => auth()->id(),
-            ]);
-
-        return response()->json([
-            'data' => $result->toArray(),
-        ]);
-    }
-
-    /**
-     * GET /api/superadmin/config/redis-queue
-     */
-    public function getRedisQueueConfig(): JsonResponse
-    {
-        $config = $this->configManager->getForDisplay('redis-queue');
-
-        return response()->json([
-            'data' => $config,
-            'schema' => $this->configManager->getServiceSchema('redis-queue'),
-        ]);
-    }
-
-    /**
-     * PUT /api/superadmin/config/redis-queue
-     */
-    public function updateRedisQueueConfig(UpdateRedisQueueConfigRequest $request): JsonResponse
-    {
-        $serviceConfig = $this->configManager->save('redis-queue', $request->validated());
-
-        return response()->json([
-            'message' => 'Redis queue configuration saved',
-            'data' => $this->configManager->getForDisplay('redis-queue'),
-        ]);
-    }
-
-    /**
-     * POST /api/superadmin/config/redis-queue/test
-     */
-    public function testRedisQueueConnection(UpdateRedisQueueConfigRequest $request): JsonResponse
-    {
-        $config = $request->validated();
-
-        // Fusionner avec la config enregistrée pour obtenir les valeurs manquantes (comme le password)
-        $savedConfig = $this->configManager->get('redis-queue') ?? [];
-        $config = array_merge($savedConfig, array_filter($config, fn($value) => $value !== null && $value !== ''));
-
-        $checker = RedisHealthChecker::forQueue();
-        $result = $checker->check($config);
-
-        // Audit trail
-        Log::channel('superadmin')->info('Service redis-queue connection test', [
-                'action' => 'service.connection.tested',
-                'service' => 'redis-queue',
-                'result' => $result->healthy ? 'success' : 'failed',
-                'message' => $result->message,
-                'user_id' => auth()->id(),
-            ]);
 
         return response()->json([
             'data' => $result->toArray(),
@@ -210,26 +115,37 @@ class ServiceConfigController extends Controller
     }
 
     /**
-     * POST /api/superadmin/config/resend/test
+     * GET /api/superadmin/config/resend/test
+     * Teste la connexion Resend avec la config sauvegardée
      */
-    public function testResendConnection(UpdateResendConfigRequest $request): JsonResponse
+    public function testResendConnection(): JsonResponse
     {
-        $config = $request->validated();
+        $config = $this->configManager->get('resend');
 
-        // Fusionner avec la config enregistrée pour obtenir les valeurs manquantes (comme l'api_key)
-        $savedConfig = $this->configManager->get('resend') ?? [];
-        $config = array_merge($savedConfig, array_filter($config, fn($value) => $value !== null && $value !== ''));
+        if (!$config) {
+            return response()->json([
+                'data' => [
+                    'service' => 'resend',
+                    'status' => 'unhealthy',
+                    'healthy' => false,
+                    'message' => 'No Resend configuration found. Please save configuration first.',
+                    'details' => [],
+                    'latencyMs' => null,
+                    'checkedAt' => now()->toIso8601String(),
+                ],
+            ]);
+        }
 
         $result = $this->resendChecker->check($config);
 
         // Audit trail
         Log::channel('superadmin')->info('Service resend connection test', [
-                'action' => 'service.connection.tested',
-                'service' => 'resend',
-                'result' => $result->healthy ? 'success' : 'failed',
-                'message' => $result->message,
-                'user_id' => auth()->id(),
-            ]);
+            'action' => 'service.connection.tested',
+            'service' => 'resend',
+            'result' => $result->healthy ? 'success' : 'failed',
+            'message' => $result->message,
+            'user_id' => auth()->id(),
+        ]);
 
         return response()->json([
             'data' => $result->toArray(),
@@ -263,26 +179,37 @@ class ServiceConfigController extends Controller
     }
 
     /**
-     * POST /api/superadmin/config/meilisearch/test
+     * GET /api/superadmin/config/meilisearch/test
+     * Teste la connexion Meilisearch avec la config sauvegardée
      */
-    public function testMeilisearchConnection(UpdateMeilisearchConfigRequest $request): JsonResponse
+    public function testMeilisearchConnection(): JsonResponse
     {
-        $config = $request->validated();
+        $config = $this->configManager->get('meilisearch');
 
-        // Fusionner avec la config enregistrée pour obtenir les valeurs manquantes (comme l'api_key)
-        $savedConfig = $this->configManager->get('meilisearch') ?? [];
-        $config = array_merge($savedConfig, array_filter($config, fn($value) => $value !== null && $value !== ''));
+        if (!$config) {
+            return response()->json([
+                'data' => [
+                    'service' => 'meilisearch',
+                    'status' => 'unhealthy',
+                    'healthy' => false,
+                    'message' => 'No Meilisearch configuration found. Please save configuration first.',
+                    'details' => [],
+                    'latencyMs' => null,
+                    'checkedAt' => now()->toIso8601String(),
+                ],
+            ]);
+        }
 
         $result = $this->meilisearchChecker->check($config);
 
         // Audit trail
         Log::channel('superadmin')->info('Service meilisearch connection test', [
-                'action' => 'service.connection.tested',
-                'service' => 'meilisearch',
-                'result' => $result->healthy ? 'success' : 'failed',
-                'message' => $result->message,
-                'user_id' => auth()->id(),
-            ]);
+            'action' => 'service.connection.tested',
+            'service' => 'meilisearch',
+            'result' => $result->healthy ? 'success' : 'failed',
+            'message' => $result->message,
+            'user_id' => auth()->id(),
+        ]);
 
         return response()->json([
             'data' => $result->toArray(),

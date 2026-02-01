@@ -2,8 +2,9 @@
     "name": "User",
     "alias": "user",
     "description": "User module with multi-tenant support",
-    "keywords": [],
-    "priority": 0,
+    "keywords": ["user", "authentication", "multi-tenant"],
+    "priority": 10,
+    "requires": ["Superadmin"],
     "providers": [
         "Modules\\User\\Providers\\UserServiceProvider"
     ],

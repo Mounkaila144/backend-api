@@ -27,26 +27,10 @@ class TenancyServiceProvider extends ServiceProvider
             function ($event) {
                 $tenant = $event->tenancy->tenant;
 
-                // Configuration dynamique de la connexion tenant
-                config([
-                    'database.connections.tenant' => [
-                        'driver' => 'mysql',
-                        'host' => $tenant->site_db_host,
-                        'port' => 3306,
-                        'database' => $tenant->site_db_name,
-                        'username' => $tenant->site_db_login,
-                        'password' => $tenant->site_db_password,
-                        'charset' => 'utf8mb4',
-                        'collation' => 'utf8mb4_unicode_ci',
-                        'prefix' => '',
-                        'strict' => true,
-                        'engine' => null,
-                        'options' => extension_loaded('pdo_mysql') ? array_filter([
-                            \PDO::ATTR_PERSISTENT => true,
-                            \PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => false,
-                        ]) : [],
-                    ],
-                ]);
+                // Utiliser la configuration dynamique du tenant (inclut SSL et port personnalisé)
+                $connectionConfig = $tenant->database()->connection();
+
+                config(['database.connections.tenant' => $connectionConfig]);
 
                 // Purger et reconnecter
                 DB::purge('tenant');
@@ -61,6 +45,8 @@ class TenancyServiceProvider extends ServiceProvider
                         'tenant_id' => $tenant->site_id,
                         'host' => $tenant->site_host,
                         'database' => $tenant->site_db_name,
+                        'port' => $connectionConfig['port'] ?? 3306,
+                        'ssl_enabled' => isset($connectionConfig['options'][\PDO::MYSQL_ATTR_SSL_CA]),
                     ]);
                 }
             }

@@ -20,14 +20,6 @@ class ServiceConfigManager
             'required' => ['host', 'port', 'username', 'password', 'database_prefix'],
             'optional' => ['charset', 'collation'],
         ],
-        'redis-cache' => [
-            'required' => ['host', 'port'],
-            'optional' => ['password', 'database', 'prefix', 'ssl', 'tls'],
-        ],
-        'redis-queue' => [
-            'required' => ['host', 'port'],
-            'optional' => ['password', 'database', 'queue_name', 'ssl', 'tls'],
-        ],
         'resend' => [
             'required' => ['from_address', 'from_name'],
             'optional' => ['api_key', 'reply_to', 'test_email'],

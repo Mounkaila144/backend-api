@@ -2,75 +2,157 @@
 
 namespace Modules\User\Repositories;
 
+use App\Search\SearchManager;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Modules\User\Entities\User;
+use Modules\User\Services\UserCacheService;
 
 /**
- * User Repository
- * Handles data access and complex queries for users
+ * User Repository - Gère l'accès aux données utilisateurs
  */
 class UserRepository
 {
+    protected ?UserCacheService $cacheService = null;
+    protected ?string $lastSearchEngine = null;
+    protected ?int $lastSearchTimeMs = null;
+
+    public function __construct()
+    {
+        try {
+            $this->cacheService = app(UserCacheService::class);
+        } catch (\Exception $e) {}
+    }
     /**
      * Get paginated users with filters
+     * Utilise Meilisearch pour la recherche si disponible
+     */
+    public function getPaginated(array $filters = [], int $perPage = 100): LengthAwarePaginator
+    {
+        $page = (int) request()->get('page', 1);
+        $searchQuery = $this->extractSearchQuery($filters);
+        $useMeilisearch = $searchQuery && SearchManager::available();
+
+        $fetcher = fn() => $useMeilisearch
+            ? $this->fetchWithMeilisearch($filters, $perPage, $searchQuery)
+            : $this->fetchPaginatedUsers($filters, $perPage);
+
+        if ($this->cacheService) {
+            $key = $this->cacheService->generateListKey($filters, $page, $perPage);
+            return $this->cacheService->rememberUserList($key, $fetcher);
+        }
+
+        return $fetcher();
+    }
+
+    /** Retourne les infos sur le moteur de recherche utilisé */
+    public function getLastSearchInfo(): array
+    {
+        return [
+            'engine' => $this->lastSearchEngine ?? 'sql',
+            'processing_time_ms' => $this->lastSearchTimeMs,
+            'meilisearch_available' => SearchManager::available(),
+        ];
+    }
+
+    /** Extrait la requête de recherche des filtres */
+    protected function extractSearchQuery(array $filters): ?string
+    {
+        $search = $filters['search'] ?? null;
+        if (is_string($search)) return trim($search) ?: null;
+        if (is_array($search)) return trim($search['query'] ?? '') ?: null;
+        return null;
+    }
+
+    /** Recherche avec Meilisearch */
+    protected function fetchWithMeilisearch(array $filters, int $perPage, string $query): LengthAwarePaginator
+    {
+        $page = (int) request()->get('page', 1);
+
+        $result = SearchManager::search(new User, $query, [
+            'limit' => $perPage,
+            'offset' => ($page - 1) * $perPage,
+            'filter' => $this->buildMeilisearchFilter($filters),
+            'sort' => $this->buildMeilisearchSort($filters['order'] ?? []),
+        ]);
+
+        if ($result['fallback']) {
+            $this->lastSearchEngine = 'sql_fallback';
+            return $this->fetchPaginatedUsers($filters, $perPage);
+        }
+
+        $this->lastSearchEngine = 'meilisearch';
+        $this->lastSearchTimeMs = $result['processingTimeMs'] ?? null;
+
+        $ids = array_column($result['hits'], 'id');
+        if (empty($ids)) {
+            return new LengthAwarePaginator(collect([]), 0, $perPage, $page);
+        }
+
+        $users = $this->loadUsersById($ids);
+        $order = array_flip($ids);
+        $users = $users->sortBy(fn($u) => $order[$u->id] ?? PHP_INT_MAX)->values();
+
+        return new LengthAwarePaginator($users, $result['totalHits'], $perPage, $page);
+    }
+
+    /** Charge les utilisateurs par IDs avec relations (utilisé par Meilisearch) */
+    protected function loadUsersById(array $ids): \Illuminate\Database\Eloquent\Collection
+    {
+        $users = User::query()
+            ->with(['groups:id,name', 'creator:id,username,firstname,lastname', 'callcenter:id,name'])
+            ->whereIn('t_users.id', $ids)
+            ->get();
+
+        // Charger les listes agrégées de la même manière que fetchPaginatedUsers
+        $this->loadAggregatedLists($users);
+
+        return $users;
+    }
+
+    /** Construit le filtre Meilisearch */
+    protected function buildMeilisearchFilter(array $filters): array
+    {
+        $f = [];
+        $eq = $filters['equal'] ?? [];
+        if (!empty($eq['is_active'])) $f['is_active'] = $eq['is_active'];
+        if (!empty($eq['is_locked'])) $f['is_locked'] = $eq['is_locked'];
+        if (!empty($eq['status'])) $f['status'] = $eq['status'];
+        if (!empty($eq['callcenter_id']) && $eq['callcenter_id'] !== 'IS_NULL') $f['callcenter_id'] = (int)$eq['callcenter_id'];
+        return $f;
+    }
+
+    /** Construit le tri Meilisearch */
+    protected function buildMeilisearchSort(array $order): array
+    {
+        $sort = [];
+        foreach ($order as $field => $dir) {
+            if (in_array($field, ['id', 'username', 'firstname', 'lastname', 'created_at'])) {
+                $sort[] = "{$field}:" . strtolower($dir);
+            }
+        }
+        return $sort;
+    }
+
+    /**
+     * Récupère les utilisateurs paginés depuis la base de données
+     * OPTIMISÉ: Utilise des JOINs au lieu de sous-requêtes corrélées
      *
      * @param array $filters
      * @param int $perPage
      * @return LengthAwarePaginator
      */
-    public function getPaginated(array $filters = [], int $perPage = 100): LengthAwarePaginator
+    protected function fetchPaginatedUsers(array $filters, int $perPage): LengthAwarePaginator
     {
-        $selects = [
-            't_users.*',
-            // Aggregate functions and subqueries for additional data
-            // Only groups_list is guaranteed to exist
-            DB::raw('(SELECT GROUP_CONCAT(t_groups.name ORDER BY t_groups.name ASC)
-                     FROM t_user_group
-                     LEFT JOIN t_groups ON t_user_group.group_id = t_groups.id
-                     WHERE t_user_group.user_id = t_users.id
-                     AND t_groups.name != "superadmin"
-                     ) as groups_list'),
-        ];
-
-        // Check which tables exist and add corresponding selects
-        $existingTables = $this->getExistingTables();
-
-        if (in_array('t_users_team_users', $existingTables) && in_array('t_users_team', $existingTables)) {
-            $selects[] = DB::raw('(SELECT GROUP_CONCAT(t_users_team.name ORDER BY t_users_team.name ASC)
-                         FROM t_users_team_users
-                         LEFT JOIN t_users_team ON t_users_team_users.team_id = t_users_team.id
-                         WHERE t_users_team_users.user_id = t_users.id
-                         ) as teams_list');
-        }
-
-        if (in_array('t_users_functions', $existingTables) && in_array('t_users_function', $existingTables)) {
-            $selects[] = DB::raw('(SELECT GROUP_CONCAT(t_users_function.name ORDER BY t_users_function.name ASC)
-                         FROM t_users_functions
-                         LEFT JOIN t_users_function ON t_users_functions.function_id = t_users_function.id
-                         WHERE t_users_functions.user_id = t_users.id
-                         ) as functions_list');
-        }
-
-        if (in_array('t_users_profiles', $existingTables) && in_array('t_users_profile', $existingTables)) {
-            // Use translated profile names from i18n table (French language)
-            $selects[] = DB::raw('(SELECT GROUP_CONCAT(COALESCE(t_users_profile_i18n.value, t_users_profile.name) ORDER BY COALESCE(t_users_profile_i18n.value, t_users_profile.name) ASC)
-                         FROM t_users_profiles
-                         LEFT JOIN t_users_profile ON t_users_profiles.profile_id = t_users_profile.id
-                         LEFT JOIN t_users_profile_i18n ON t_users_profile.id = t_users_profile_i18n.profile_id AND t_users_profile_i18n.lang = "fr"
-                         WHERE t_users_profiles.user_id = t_users.id
-                         ) as profiles');
-        }
-
+        // OPTIMISATION: Eager loading minimal pour la liste
+        // On ne charge que les relations nécessaires pour l'affichage
         $with = [
             'groups:id,name',
             'creator:id,username,firstname,lastname',
-            'unlocker:id,username,firstname,lastname',
             'callcenter:id,name',
         ];
 
         $query = User::query()
-            ->select($selects)
             ->with($with)
             ->where('application', 'admin')
             ->where('username', 'NOT LIKE', 'superadmin%');
@@ -81,29 +163,147 @@ class UserRepository
         // Apply sorting
         $this->applySorting($query, $filters);
 
-        return $query->paginate($perPage);
+        $paginator = $query->paginate($perPage);
+
+        // OPTIMISATION: Charger les listes agrégées en 2-3 requêtes au lieu de N sous-requêtes
+        $this->loadAggregatedLists($paginator->getCollection());
+
+        return $paginator;
+    }
+
+    /**
+     * Charge les listes agrégées (groups, teams, functions, profiles) en requêtes batch
+     * OPTIMISATION: 4 requêtes au lieu de 4*N sous-requêtes
+     *
+     * @param \Illuminate\Support\Collection $users
+     * @return void
+     */
+    protected function loadAggregatedLists(\Illuminate\Support\Collection $users): void
+    {
+        if ($users->isEmpty()) {
+            return;
+        }
+
+        $userIds = $users->pluck('id')->toArray();
+
+        // 1. Charger les groupes en une seule requête
+        $groupsData = DB::table('t_user_group')
+            ->join('t_groups', 't_user_group.group_id', '=', 't_groups.id')
+            ->whereIn('t_user_group.user_id', $userIds)
+            ->where('t_groups.name', '!=', 'superadmin')
+            ->select('t_user_group.user_id', 't_groups.name')
+            ->orderBy('t_groups.name')
+            ->get()
+            ->groupBy('user_id')
+            ->map(fn($items) => $items->pluck('name')->implode(','));
+
+        // 2. Charger les teams (si la table existe)
+        $teamsData = collect();
+        if ($this->tableExists('t_users_team_users') && $this->tableExists('t_users_team')) {
+            $teamsData = DB::table('t_users_team_users')
+                ->join('t_users_team', 't_users_team_users.team_id', '=', 't_users_team.id')
+                ->whereIn('t_users_team_users.user_id', $userIds)
+                ->select('t_users_team_users.user_id', 't_users_team.name')
+                ->orderBy('t_users_team.name')
+                ->get()
+                ->groupBy('user_id')
+                ->map(fn($items) => $items->pluck('name')->implode(','));
+        }
+
+        // 3. Charger les fonctions (si la table existe)
+        $functionsData = collect();
+        if ($this->tableExists('t_users_functions') && $this->tableExists('t_users_function')) {
+            $functionsData = DB::table('t_users_functions')
+                ->join('t_users_function', 't_users_functions.function_id', '=', 't_users_function.id')
+                ->whereIn('t_users_functions.user_id', $userIds)
+                ->select('t_users_functions.user_id', 't_users_function.name')
+                ->orderBy('t_users_function.name')
+                ->get()
+                ->groupBy('user_id')
+                ->map(fn($items) => $items->pluck('name')->implode(','));
+        }
+
+        // 4. Charger les profils avec traduction (si la table existe)
+        $profilesData = collect();
+        if ($this->tableExists('t_users_profiles') && $this->tableExists('t_users_profile')) {
+            $profilesData = DB::table('t_users_profiles')
+                ->join('t_users_profile', 't_users_profiles.profile_id', '=', 't_users_profile.id')
+                ->leftJoin('t_users_profile_i18n', function ($join) {
+                    $join->on('t_users_profile.id', '=', 't_users_profile_i18n.profile_id')
+                        ->where('t_users_profile_i18n.lang', '=', 'fr');
+                })
+                ->whereIn('t_users_profiles.user_id', $userIds)
+                ->select(
+                    't_users_profiles.user_id',
+                    DB::raw('COALESCE(t_users_profile_i18n.value, t_users_profile.name) as name')
+                )
+                ->orderBy('name')
+                ->get()
+                ->groupBy('user_id')
+                ->map(fn($items) => $items->pluck('name')->implode(','));
+        }
+
+        // Assigner les données aux utilisateurs
+        foreach ($users as $user) {
+            $user->groups_list = $groupsData->get($user->id);
+            $user->teams_list = $teamsData->get($user->id);
+            $user->functions_list = $functionsData->get($user->id);
+            $user->profiles = $profilesData->get($user->id);
+        }
+    }
+
+    /**
+     * Vérifie si une table existe (avec cache mémoire)
+     *
+     * @param string $tableName
+     * @return bool
+     */
+    protected function tableExists(string $tableName): bool
+    {
+        return in_array($tableName, $this->getExistingTables());
     }
 
     /**
      * Get list of existing tables in the current database
+     * OPTIMISÉ: Une seule requête SHOW TABLES au lieu de 11 requêtes séparées
      *
      * @return array
      */
     protected function getExistingTables(): array
     {
-        static $tables = null;
+        static $tablesByTenant = [];
 
-        if ($tables === null) {
+        $tenantId = tenancy()->tenant->site_id ?? 'default';
+
+        if (!isset($tablesByTenant[$tenantId])) {
             try {
-                $tables = array_map(function ($table) {
-                    return array_values((array) $table)[0];
-                }, DB::select('SHOW TABLES'));
+                // Une seule requête pour lister toutes les tables
+                $allTables = collect(DB::select('SHOW TABLES'))
+                    ->map(fn($row) => array_values((array) $row)[0])
+                    ->toArray();
+
+                // Filtrer uniquement les tables qui nous intéressent
+                $optionalTables = [
+                    't_users_team_users',
+                    't_users_team',
+                    't_users_functions',
+                    't_users_function',
+                    't_users_profiles',
+                    't_users_profile',
+                    't_users_profile_i18n',
+                    't_users_attributions',
+                    't_users_attribution',
+                    't_callcenter',
+                    't_user_property',
+                ];
+
+                $tablesByTenant[$tenantId] = array_intersect($optionalTables, $allTables);
             } catch (\Exception $e) {
-                $tables = [];
+                $tablesByTenant[$tenantId] = [];
             }
         }
 
-        return $tables;
+        return $tablesByTenant[$tenantId];
     }
 
     /**
@@ -334,11 +534,30 @@ class UserRepository
 
     /**
      * Find user by ID with relations
+     * Utilise le cache Redis si disponible
      *
      * @param int $id
      * @return User
      */
     public function findWithRelations(int $id): User
+    {
+        // Utiliser le cache si disponible
+        if ($this->cacheService) {
+            return $this->cacheService->rememberUser($id, function () use ($id) {
+                return $this->fetchUserWithRelations($id);
+            });
+        }
+
+        return $this->fetchUserWithRelations($id);
+    }
+
+    /**
+     * Récupère un utilisateur avec ses relations depuis la base de données
+     *
+     * @param int $id
+     * @return User
+     */
+    protected function fetchUserWithRelations(int $id): User
     {
         $with = [
             'groups:id,name',
@@ -449,6 +668,9 @@ class UserRepository
 
             DB::table('t_user_permission')->insert($insertData);
         }
+
+        // Invalider le cache des listes
+        $this->invalidateUserCaches();
 
         return $user;
     }
@@ -566,6 +788,9 @@ class UserRepository
             }
         }
 
+        // Invalider le cache
+        $this->invalidateUserCache($user->id);
+
         return $user->fresh();
     }
 
@@ -578,56 +803,111 @@ class UserRepository
     public function delete(int $id): bool
     {
         $user = User::findOrFail($id);
-        return $user->update(['status' => 'DELETE']);
+        $result = $user->update(['status' => 'DELETE']);
+
+        if ($result) {
+            $this->invalidateUserCache($id);
+        }
+
+        return $result;
     }
 
     /**
      * Get user statistics
+     * Utilise le cache Redis si disponible
      *
      * @return array
      */
     public function getStatistics(): array
     {
+        if ($this->cacheService) {
+            return $this->cacheService->rememberStatistics(function () {
+                return $this->fetchStatistics();
+            });
+        }
+
+        return $this->fetchStatistics();
+    }
+
+    /**
+     * Récupère les statistiques depuis la base de données
+     * OPTIMISÉ: Une seule requête avec COUNT conditionnel au lieu de 4 requêtes
+     *
+     * @return array
+     */
+    protected function fetchStatistics(): array
+    {
+        $stats = DB::table('t_users')
+            ->where('application', 'admin')
+            ->where('username', 'NOT LIKE', 'superadmin%')
+            ->selectRaw('
+                COUNT(*) as total,
+                SUM(CASE WHEN is_active = "YES" THEN 1 ELSE 0 END) as active,
+                SUM(CASE WHEN is_active = "NO" THEN 1 ELSE 0 END) as inactive,
+                SUM(CASE WHEN is_locked = "YES" THEN 1 ELSE 0 END) as locked
+            ')
+            ->first();
+
         return [
-            'total' => User::where('application', 'admin')->noSuperadmin()->count(),
-            'active' => User::where('application', 'admin')->noSuperadmin()->active()->count(),
-            'inactive' => User::where('application', 'admin')->noSuperadmin()->where('is_active', 'NO')->count(),
-            'locked' => User::where('application', 'admin')->noSuperadmin()->where('is_locked', 'YES')->count(),
+            'total' => (int) ($stats->total ?? 0),
+            'active' => (int) ($stats->active ?? 0),
+            'inactive' => (int) ($stats->inactive ?? 0),
+            'locked' => (int) ($stats->locked ?? 0),
         ];
     }
 
     /**
      * Get creation options for user form
      * Returns lists of available groups, functions, profiles, teams, etc.
+     * Utilise le cache Redis si disponible
      *
      * @return array
      */
     public function getCreationOptions(): array
     {
+        if ($this->cacheService) {
+            return $this->cacheService->rememberCreationOptions(function () {
+                return $this->fetchCreationOptions();
+            });
+        }
+
+        return $this->fetchCreationOptions();
+    }
+
+    /**
+     * Récupère les options de création depuis la base de données
+     *
+     * @return array
+     */
+    protected function fetchCreationOptions(): array
+    {
         $existingTables = $this->getExistingTables();
         $options = [];
 
-        // Get groups with their permissions
-        $options['groups'] = DB::table('t_groups')
+        // Get all groups
+        $groups = DB::table('t_groups')
             ->where('application', 'admin')
             ->select('id', 'name')
             ->orderBy('name')
-            ->get()
-            ->map(function ($group) {
-                // Get permissions for this group
-                $permissionIds = DB::table('t_group_permission')
-                    ->where('group_id', $group->id)
-                    ->pluck('permission_id')
-                    ->toArray();
+            ->get();
 
-                return [
-                    'id' => $group->id,
-                    'name' => $group->name,
-                    'permissions_count' => count($permissionIds),
-                    'permission_ids' => $permissionIds,
-                ];
-            })
-            ->toArray();
+        // Get all group permissions in one query (avoid N+1)
+        $groupPermissions = DB::table('t_group_permission')
+            ->whereIn('group_id', $groups->pluck('id'))
+            ->select('group_id', 'permission_id')
+            ->get()
+            ->groupBy('group_id');
+
+        // Map groups with their permissions
+        $options['groups'] = $groups->map(function ($group) use ($groupPermissions) {
+            $permissionIds = $groupPermissions->get($group->id, collect())->pluck('permission_id')->toArray();
+            return [
+                'id' => $group->id,
+                'name' => $group->name,
+                'permissions_count' => count($permissionIds),
+                'permission_ids' => $permissionIds,
+            ];
+        })->toArray();
 
         // Get all permissions grouped by group_id
         $permissions = DB::table('t_permissions')
@@ -725,5 +1005,44 @@ class UserRepository
         }
 
         return $options;
+    }
+
+    // =========================================================================
+    // CACHE & SEARCH HELPER METHODS
+    // =========================================================================
+
+    /**
+     * Invalide le cache d'un utilisateur spécifique
+     *
+     * @param int $userId
+     * @return void
+     */
+    protected function invalidateUserCache(int $userId): void
+    {
+        if ($this->cacheService) {
+            $this->cacheService->forgetUser($userId);
+        }
+    }
+
+    /**
+     * Invalide tous les caches utilisateurs (listes, statistiques)
+     *
+     * @return void
+     */
+    protected function invalidateUserCaches(): void
+    {
+        if ($this->cacheService) {
+            $this->cacheService->invalidateUserLists();
+            $this->cacheService->forgetStatistics();
+        }
+    }
+
+    /** Retourne les diagnostics du cache et de la recherche */
+    public function getServicesDiagnostics(): array
+    {
+        return [
+            'cache' => $this->cacheService?->getDiagnostics() ?? ['available' => false],
+            'search' => ['available' => SearchManager::available()],
+        ];
     }
 }

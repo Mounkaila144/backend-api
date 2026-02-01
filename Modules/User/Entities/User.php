@@ -2,6 +2,7 @@
 
 namespace Modules\User\Entities;
 
+use App\Search\Searchable;
 use App\Traits\HasPermissions;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,7 +15,16 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class User extends Model
 {
-    use HasPermissions;
+    use HasPermissions, Searchable;
+
+    /** Attributs indexés pour la recherche full-text */
+    protected array $searchable = ['username', 'firstname', 'lastname', 'email', 'phone', 'mobile'];
+
+    /** Attributs filtrables dans Meilisearch */
+    protected array $searchableFilters = ['is_active', 'is_locked', 'status', 'sex', 'callcenter_id'];
+
+    /** Attributs triables */
+    protected array $searchableSortable = ['id', 'username', 'firstname', 'lastname', 'created_at'];
     /**
      * Table name
      */

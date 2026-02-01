@@ -25,7 +25,9 @@ class SiteResource extends JsonResource
                 'host' => $this->site_db_host,
                 'port' => $this->site_db_port ?? 3306,
                 'login' => $this->site_db_login,
-                'password' => $this->site_db_password,
+                // Ne pas renvoyer le mot de passe réel pour des raisons de sécurité
+                // Renvoyer un indicateur pour savoir si un mot de passe est défini
+                'has_password' => !empty($this->site_db_password),
                 'size' => $this->site_db_size,
                 'ssl' => [
                     'enabled' => $this->site_db_ssl_enabled === 'YES',

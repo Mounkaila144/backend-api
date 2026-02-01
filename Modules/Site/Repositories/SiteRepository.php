@@ -188,6 +188,12 @@ class SiteRepository
      */
     public function update(Tenant $site, array $data): Tenant
     {
+        // S'assurer que site_db_password est une chaîne vide et non null
+        // (la colonne n'accepte pas NULL mais accepte les chaînes vides)
+        if (array_key_exists('site_db_password', $data) && $data['site_db_password'] === null) {
+            $data['site_db_password'] = '';
+        }
+
         // Utiliser une requête directe pour éviter les problèmes avec le modèle Stancl Tenancy
         DB::connection('mysql')
             ->table('t_sites')
@@ -266,10 +272,13 @@ class SiteRepository
                 }
             }
 
+            // Si le mot de passe est vide, passer null pour une connexion sans mot de passe
+            $password = !empty($site->site_db_password) ? $site->site_db_password : null;
+
             $pdo = new \PDO(
                 $dsn,
                 $site->site_db_login,
-                $site->site_db_password,
+                $password,
                 $options
             );
 
@@ -382,13 +391,16 @@ class SiteRepository
     protected function setupTenantTables(Tenant $site): void
     {
         // Configuration temporaire pour se connecter au tenant
+        // Si le mot de passe est vide, passer null pour une connexion sans mot de passe
+        $password = !empty($site->site_db_password) ? $site->site_db_password : null;
+
         $config = [
             'driver' => 'mysql',
             'host' => $site->site_db_host,
             'port' => $site->site_db_port ?? 3306,
             'database' => $site->site_db_name,
             'username' => $site->site_db_login,
-            'password' => $site->site_db_password,
+            'password' => $password,
             'charset' => 'utf8mb4',
             'collation' => 'utf8mb4_unicode_ci',
         ];

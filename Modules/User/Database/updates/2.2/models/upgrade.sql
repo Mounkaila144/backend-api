@@ -1,0 +1,1 @@
+ALTER TABLE `t_users_validation_token` CHANGE `callback` `callback` VARCHAR(4096) CHARACTER SET utf8 COLLATE utf8_general_ci NOT NULL;

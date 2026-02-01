@@ -6,7 +6,6 @@ use Modules\Superadmin\Services\Checkers\DatabaseHealthChecker;
 use Modules\Superadmin\Services\Checkers\HealthCheckResult;
 use Modules\Superadmin\Services\Checkers\HealthCheckResultCollection;
 use Modules\Superadmin\Services\Checkers\MeilisearchHealthChecker;
-use Modules\Superadmin\Services\Checkers\RedisHealthChecker;
 use Modules\Superadmin\Services\Checkers\ResendHealthChecker;
 use Modules\Superadmin\Services\Checkers\S3HealthChecker;
 use Illuminate\Support\Facades\Log;
@@ -18,15 +17,12 @@ class ServiceHealthChecker
     public function __construct(
         protected S3HealthChecker $s3Checker,
         protected DatabaseHealthChecker $databaseChecker,
-        protected RedisHealthChecker $redisChecker,
         protected ResendHealthChecker $resendChecker,
         protected MeilisearchHealthChecker $meilisearchChecker
     ) {
         $this->checkers = [
             's3' => $s3Checker,
             'database' => $databaseChecker,
-            'redis-cache' => $redisChecker,
-            'redis-queue' => $redisChecker, // Same checker, different config
             'resend' => $resendChecker,
             'meilisearch' => $meilisearchChecker,
         ];

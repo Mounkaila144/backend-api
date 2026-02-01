@@ -93,31 +93,9 @@ Route::prefix('api/superadmin')->middleware(['auth:sanctum'])->group(function ()
         Route::put('s3', [ServiceConfigController::class, 'updateS3Config'])
             ->middleware('throttle:superadmin-write')
             ->name('s3.update');
-        Route::post('s3/test', [ServiceConfigController::class, 'testS3Connection'])
-            ->middleware('throttle:superadmin-write')
+        Route::get('s3/test', [ServiceConfigController::class, 'testS3Connection'])
+            ->middleware('throttle:superadmin-read')
             ->name('s3.test');
-
-        // Redis Cache
-        Route::get('redis-cache', [ServiceConfigController::class, 'getRedisCacheConfig'])
-            ->middleware('throttle:superadmin-read')
-            ->name('redis-cache.show');
-        Route::put('redis-cache', [ServiceConfigController::class, 'updateRedisCacheConfig'])
-            ->middleware('throttle:superadmin-write')
-            ->name('redis-cache.update');
-        Route::post('redis-cache/test', [ServiceConfigController::class, 'testRedisCacheConnection'])
-            ->middleware('throttle:superadmin-write')
-            ->name('redis-cache.test');
-
-        // Redis Queue
-        Route::get('redis-queue', [ServiceConfigController::class, 'getRedisQueueConfig'])
-            ->middleware('throttle:superadmin-read')
-            ->name('redis-queue.show');
-        Route::put('redis-queue', [ServiceConfigController::class, 'updateRedisQueueConfig'])
-            ->middleware('throttle:superadmin-write')
-            ->name('redis-queue.update');
-        Route::post('redis-queue/test', [ServiceConfigController::class, 'testRedisQueueConnection'])
-            ->middleware('throttle:superadmin-write')
-            ->name('redis-queue.test');
 
         // Resend (Email)
         Route::get('resend', [ServiceConfigController::class, 'getResendConfig'])
@@ -126,8 +104,8 @@ Route::prefix('api/superadmin')->middleware(['auth:sanctum'])->group(function ()
         Route::put('resend', [ServiceConfigController::class, 'updateResendConfig'])
             ->middleware('throttle:superadmin-write')
             ->name('resend.update');
-        Route::post('resend/test', [ServiceConfigController::class, 'testResendConnection'])
-            ->middleware('throttle:superadmin-write')
+        Route::get('resend/test', [ServiceConfigController::class, 'testResendConnection'])
+            ->middleware('throttle:superadmin-read')
             ->name('resend.test');
 
         // Meilisearch
@@ -137,8 +115,8 @@ Route::prefix('api/superadmin')->middleware(['auth:sanctum'])->group(function ()
         Route::put('meilisearch', [ServiceConfigController::class, 'updateMeilisearchConfig'])
             ->middleware('throttle:superadmin-write')
             ->name('meilisearch.update');
-        Route::post('meilisearch/test', [ServiceConfigController::class, 'testMeilisearchConnection'])
-            ->middleware('throttle:superadmin-write')
+        Route::get('meilisearch/test', [ServiceConfigController::class, 'testMeilisearchConnection'])
+            ->middleware('throttle:superadmin-read')
             ->name('meilisearch.test');
     });
 

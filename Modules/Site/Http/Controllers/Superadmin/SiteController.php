@@ -162,7 +162,7 @@ class SiteController extends Controller
             'site_db_ssl_mode' => 'nullable|in:DISABLED,PREFERRED,REQUIRED,VERIFY_CA,VERIFY_IDENTITY',
             'site_db_ssl_ca' => 'nullable|string',
             'site_db_login' => 'sometimes|string|max:255',
-            'site_db_password' => 'sometimes|string|max:255',
+            'site_db_password' => 'nullable|string|max:255',
             'site_admin_theme' => 'sometimes|string|max:100',
             'site_admin_theme_base' => 'sometimes|string|max:100',
             'site_frontend_theme' => 'sometimes|string|max:100',

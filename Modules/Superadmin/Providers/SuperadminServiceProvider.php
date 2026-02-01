@@ -72,6 +72,11 @@ class SuperadminServiceProvider extends ServiceProvider
     {
         $this->app->register(RouteServiceProvider::class);
 
+        // Bind ServiceConfigManager as singleton (required by many services)
+        $this->app->singleton(
+            \Modules\Superadmin\Services\ServiceConfigManager::class
+        );
+
         // Bind ModuleCacheService as singleton
         $this->app->singleton(
             \Modules\Superadmin\Services\ModuleCacheService::class
@@ -89,10 +94,14 @@ class SuperadminServiceProvider extends ServiceProvider
             \Modules\Superadmin\Services\ModuleDependencyResolver::class
         );
 
-        // Bind TenantStorageManager service
-        $this->app->bind(
+        // Bind TenantStorageManager service (singleton for S3 connection reuse)
+        $this->app->singleton(
             \Modules\Superadmin\Services\TenantStorageManagerInterface::class,
-            \Modules\Superadmin\Services\TenantStorageManager::class
+            function ($app) {
+                return new \Modules\Superadmin\Services\TenantStorageManager(
+                    $app->make(\Modules\Superadmin\Services\ServiceConfigManager::class)
+                );
+            }
         );
 
         // Bind TenantMigrationRunner service
@@ -117,7 +126,6 @@ class SuperadminServiceProvider extends ServiceProvider
             return new \Modules\Superadmin\Services\ServiceHealthChecker(
                 $app->make(\Modules\Superadmin\Services\Checkers\S3HealthChecker::class),
                 $app->make(\Modules\Superadmin\Services\Checkers\DatabaseHealthChecker::class),
-                $app->make(\Modules\Superadmin\Services\Checkers\RedisHealthChecker::class),
                 $app->make(\Modules\Superadmin\Services\Checkers\ResendHealthChecker::class),
                 $app->make(\Modules\Superadmin\Services\Checkers\MeilisearchHealthChecker::class)
             );
@@ -215,14 +223,6 @@ class SuperadminServiceProvider extends ServiceProvider
             \Spatie\Health\Checks\Checks\DatabaseCheck::new()
                 ->name('database')
                 ->connectionName('mysql'),
-
-            \Spatie\Health\Checks\Checks\RedisCheck::new()
-                ->name('redis-cache')
-                ->connectionName('cache'),
-
-            \Spatie\Health\Checks\Checks\RedisCheck::new()
-                ->name('redis-queue')
-                ->connectionName('queue'),
 
             \Spatie\Health\Checks\Checks\EnvironmentCheck::new()
                 ->name('environment'),

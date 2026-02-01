@@ -2,16 +2,14 @@
 
 namespace App\Models;
 
-use PDO;
+use App\Tenancy\CustomDatabaseConfig;
 use Stancl\Tenancy\Database\Models\Tenant as BaseTenant;
 use Stancl\Tenancy\Contracts\TenantWithDatabase;
-use Stancl\Tenancy\Database\Concerns\HasDatabase;
 use Stancl\Tenancy\Database\Concerns\HasDomains;
-use Stancl\Tenancy\DatabaseConfig;
 
 class Tenant extends BaseTenant implements TenantWithDatabase
 {
-    use HasDatabase, HasDomains;
+    use HasDomains;
 
     /**
      * ⚠️ IMPORTANT: Utiliser votre table existante t_sites
@@ -83,55 +81,9 @@ class Tenant extends BaseTenant implements TenantWithDatabase
     /**
      * Configuration dynamique de la base de données tenant
      */
-    public function database(): DatabaseConfig
+    public function database(): \Stancl\Tenancy\DatabaseConfig
     {
-        $config = [
-            'driver' => 'mysql',
-            'host' => $this->site_db_host,
-            'port' => $this->site_db_port ?? 3306,
-            'database' => $this->site_db_name,
-            'username' => $this->site_db_login,
-            'password' => $this->site_db_password,
-            'charset' => 'utf8mb4',
-            'collation' => 'utf8mb4_unicode_ci',
-            'prefix' => '',
-            'strict' => true,
-            'engine' => null,
-        ];
-
-        // Configuration SSL si activée
-        if ($this->site_db_ssl_enabled === 'YES') {
-            $sslOptions = [];
-
-            // Mode SSL
-            $sslMode = $this->site_db_ssl_mode ?? 'REQUIRED';
-            if ($sslMode !== 'DISABLED') {
-                $sslOptions[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = in_array($sslMode, ['VERIFY_CA', 'VERIFY_IDENTITY']);
-            }
-
-            // Certificat CA
-            if (!empty($this->site_db_ssl_ca)) {
-                // Si c'est un chemin de fichier
-                if (file_exists($this->site_db_ssl_ca)) {
-                    $sslOptions[PDO::MYSQL_ATTR_SSL_CA] = $this->site_db_ssl_ca;
-                } else {
-                    // Si c'est le contenu du certificat, on le sauvegarde temporairement
-                    $tempCaFile = storage_path('app/ssl/tenant_' . $this->site_id . '_ca.pem');
-                    $sslDir = dirname($tempCaFile);
-                    if (!is_dir($sslDir)) {
-                        mkdir($sslDir, 0755, true);
-                    }
-                    file_put_contents($tempCaFile, $this->site_db_ssl_ca);
-                    $sslOptions[PDO::MYSQL_ATTR_SSL_CA] = $tempCaFile;
-                }
-            }
-
-            if (!empty($sslOptions)) {
-                $config['options'] = $sslOptions;
-            }
-        }
-
-        return DatabaseConfig::from($config);
+        return new CustomDatabaseConfig($this);
     }
 
     /**

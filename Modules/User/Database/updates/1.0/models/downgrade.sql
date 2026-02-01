@@ -1,0 +1,1 @@
+ALTER TABLE `t_users_team` DROP `manager2_id`;
