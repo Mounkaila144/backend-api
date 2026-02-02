@@ -114,6 +114,8 @@ class ModuleDiscovery implements ModuleDiscoveryInterface
                     'installed_at' => $tenantModule->installed_at?->toIso8601String(),
                     'uninstalled_at' => $tenantModule->uninstalled_at?->toIso8601String(),
                     'config' => $tenantModule->config,
+                    'installed_version' => $tenantModule->installed_version,
+                    'version_history' => $tenantModule->version_history,
                 ] : null,
             ]);
         });
@@ -144,6 +146,8 @@ class ModuleDiscovery implements ModuleDiscoveryInterface
                 'installed_at' => $siteModule->installed_at?->toIso8601String(),
                 'uninstalled_at' => $siteModule->uninstalled_at?->toIso8601String(),
                 'config' => $siteModule->config,
+                'installed_version' => $siteModule->installed_version,
+                'version_history' => $siteModule->version_history,
             ],
         ]);
     }

@@ -1,0 +1,1 @@
+ALTER TABLE `t_users_team` ADD  `manager2_id` int(11) NOT NULL AFTER `manager_id`;

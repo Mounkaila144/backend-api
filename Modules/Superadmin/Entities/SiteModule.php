@@ -33,6 +33,9 @@ class SiteModule extends Model
         'installed_at',
         'uninstalled_at',
         'config',
+        'installed_version',
+        'version_updated_at',
+        'version_history',
     ];
 
     /**
@@ -42,6 +45,8 @@ class SiteModule extends Model
         'config' => 'array',
         'installed_at' => 'datetime',
         'uninstalled_at' => 'datetime',
+        'version_updated_at' => 'datetime',
+        'version_history' => 'array',
     ];
 
     /**
@@ -82,5 +87,71 @@ class SiteModule extends Model
     public function isActive(): bool
     {
         return $this->is_active === 'YES';
+    }
+
+    /**
+     * Helper: Retourne la version installée ou null
+     */
+    public function getInstalledVersion(): ?string
+    {
+        return $this->installed_version;
+    }
+
+    /**
+     * Helper: Vérifie si une version spécifique est installée
+     */
+    public function hasVersion(string $version): bool
+    {
+        return $this->installed_version !== null
+            && version_compare($this->installed_version, $version, '>=');
+    }
+
+    /**
+     * Helper: Met à jour la version installée et l'historique
+     */
+    public function updateVersion(string $newVersion, array $appliedVersions = []): void
+    {
+        $history = $this->version_history ?? [];
+
+        // Ajouter l'entrée à l'historique
+        $history[] = [
+            'from_version' => $this->installed_version,
+            'to_version' => $newVersion,
+            'applied_versions' => $appliedVersions,
+            'applied_at' => now()->toIso8601String(),
+        ];
+
+        $this->update([
+            'installed_version' => $newVersion,
+            'version_updated_at' => now(),
+            'version_history' => $history,
+        ]);
+    }
+
+    /**
+     * Helper: Vérifie si le module nécessite une mise à jour vers une version cible
+     */
+    public function needsUpgrade(string $targetVersion): bool
+    {
+        if ($this->installed_version === null) {
+            return true;
+        }
+
+        return version_compare($this->installed_version, $targetVersion, '<');
+    }
+
+    /**
+     * Helper: Retourne l'historique des versions formaté
+     */
+    public function getVersionHistoryFormatted(): array
+    {
+        return array_map(function ($entry) {
+            return [
+                'from' => $entry['from_version'] ?? 'initial',
+                'to' => $entry['to_version'],
+                'date' => $entry['applied_at'] ?? null,
+                'versions_count' => count($entry['applied_versions'] ?? []),
+            ];
+        }, $this->version_history ?? []);
     }
 }

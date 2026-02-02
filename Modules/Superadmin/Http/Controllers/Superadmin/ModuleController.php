@@ -434,4 +434,124 @@ class ModuleController extends Controller
             ]),
         ]);
     }
+
+    /**
+     * Vérifie les mises à jour disponibles pour un module
+     * GET /api/superadmin/sites/{id}/modules/{module}/upgrades
+     */
+    public function checkUpgrades(int $id, string $module): JsonResponse
+    {
+        $tenant = Tenant::findOrFail($id);
+
+        try {
+            $upgradeInfo = $this->moduleInstaller->hasAvailableUpgrades($tenant, $module);
+
+            return response()->json([
+                'data' => [
+                    'module' => $module,
+                    'tenant_id' => $id,
+                    ...$upgradeInfo,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Failed to check upgrades',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Met à jour un module vers une version spécifique
+     * POST /api/superadmin/sites/{id}/modules/{module}/upgrade
+     * Body optionnel: { "target_version": "2.9" }
+     */
+    public function upgrade(Request $request, int $id, string $module): JsonResponse
+    {
+        $tenant = Tenant::findOrFail($id);
+
+        $request->validate([
+            'target_version' => ['nullable', 'string', 'regex:/^\d+\.\d+(\.\d+)?$/'],
+        ]);
+
+        $targetVersion = $request->input('target_version');
+
+        try {
+            $result = $this->moduleInstaller->upgrade($tenant, $module, $targetVersion);
+
+            $statusCode = $result['success'] ? 200 : 422;
+
+            return response()->json([
+                'message' => $result['success'] ? 'Module upgraded successfully' : 'Module upgrade failed',
+                'data' => [
+                    'module' => $module,
+                    'tenant_id' => $id,
+                    ...$result,
+                ],
+            ], $statusCode);
+
+        } catch (\RuntimeException $e) {
+            return response()->json([
+                'message' => 'Module upgrade failed',
+                'error' => [
+                    'code' => 'UPGRADE_FAILED',
+                    'detail' => $e->getMessage(),
+                ],
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Module upgrade failed',
+                'error' => [
+                    'code' => 'UPGRADE_ERROR',
+                    'detail' => $e->getMessage(),
+                ],
+            ], 500);
+        }
+    }
+
+    /**
+     * Liste les versions disponibles pour un module
+     * GET /api/superadmin/modules/{module}/versions
+     */
+    public function versions(string $module): JsonResponse
+    {
+        try {
+            $discovery = app(\Modules\Superadmin\Services\Legacy\LegacyUpdateDiscoveryInterface::class);
+
+            if (!$discovery->hasLegacyStructure($module)) {
+                return response()->json([
+                    'data' => [
+                        'module' => $module,
+                        'has_versions' => false,
+                        'message' => 'Module has no legacy version structure',
+                    ],
+                ]);
+            }
+
+            $versions = $discovery->getAvailableVersions($module);
+            $latestVersion = $discovery->getLatestVersion($module);
+
+            $versionDetails = array_map(function ($version) use ($discovery, $module) {
+                return $discovery->getVersionInfo($module, $version);
+            }, $versions);
+
+            return response()->json([
+                'data' => [
+                    'module' => $module,
+                    'has_versions' => true,
+                    'latest_version' => $latestVersion,
+                    'versions_count' => count($versions),
+                    'versions' => $versionDetails,
+                    'has_schema' => $discovery->hasSchemaFile($module),
+                    'has_drop' => $discovery->hasDropFile($module),
+                ],
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Failed to get module versions',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
 }

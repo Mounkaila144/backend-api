@@ -58,6 +58,21 @@ Route::prefix('api/superadmin')->middleware(['auth:sanctum'])->group(function ()
         ->middleware('throttle:superadmin-read')
         ->name('superadmin.sites.modules.impact');
 
+    // Vérifier les mises à jour disponibles pour un module (DOIT ÊTRE AVANT {module})
+    Route::get('sites/{id}/modules/{module}/upgrades', [ModuleController::class, 'checkUpgrades'])
+        ->middleware('throttle:superadmin-read')
+        ->name('superadmin.sites.modules.upgrades');
+
+    // Mettre à jour un module vers une version plus récente (DOIT ÊTRE AVANT {module})
+    Route::post('sites/{id}/modules/{module}/upgrade', [ModuleController::class, 'upgrade'])
+        ->middleware('throttle:superadmin-heavy')
+        ->name('superadmin.sites.modules.upgrade');
+
+    // Lister les versions disponibles pour un module
+    Route::get('modules/{module}/versions', [ModuleController::class, 'versions'])
+        ->middleware('throttle:superadmin-read')
+        ->name('superadmin.modules.versions');
+
     // Activer un module pour un tenant
     Route::post('sites/{id}/modules/{module}', [ModuleController::class, 'activate'])
         ->middleware('throttle:superadmin-heavy')

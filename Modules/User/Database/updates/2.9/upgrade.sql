@@ -1,0 +1,1 @@
+UPDATE `t_users` SET `is_active`='NO' WHERE `status`='DELETE';

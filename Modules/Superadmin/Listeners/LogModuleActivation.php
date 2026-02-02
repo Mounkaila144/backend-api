@@ -43,7 +43,7 @@ class LogModuleActivation
         Log::channel('superadmin')->error("Module activation failed", [
             'action' => 'module.activation_failed',
             'module' => $event->moduleName,
-            'tenant_id' => $event->siteId,
+            'tenant_id' => $event->tenantId,
             'error' => $event->errorMessage,
             'completed_steps' => $event->completedSteps,
         ]);

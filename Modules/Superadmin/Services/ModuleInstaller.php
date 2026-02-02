@@ -10,6 +10,7 @@ use Modules\Superadmin\Events\ModuleDeactivated;
 use Modules\Superadmin\Exceptions\ModuleActivationException;
 use Modules\Superadmin\Exceptions\ModuleDeactivationException;
 use Modules\Superadmin\Exceptions\SagaException;
+use Modules\Superadmin\Services\Legacy\LegacyUpdateRunnerInterface;
 use Modules\Superadmin\Traits\LogsSuperadminActivity;
 
 class ModuleInstaller implements ModuleInstallerInterface
@@ -21,7 +22,8 @@ class ModuleInstaller implements ModuleInstallerInterface
         private ModuleDependencyResolverInterface $dependencyResolver,
         private TenantStorageManagerInterface $storageManager,
         private TenantMigrationRunnerInterface $migrationRunner,
-        private ModuleCacheService $cache
+        private ModuleCacheService $cache,
+        private ?LegacyUpdateRunnerInterface $legacyUpdateRunner = null
     ) {}
 
     /**
@@ -53,13 +55,14 @@ class ModuleInstaller implements ModuleInstallerInterface
         }
 
         // Construire et exécuter la saga
-        $saga = $this->buildActivationSaga($tenant, $moduleName, $config);
+        $legacyResult = null;
+        $saga = $this->buildActivationSaga($tenant, $moduleName, $config, $legacyResult);
 
         try {
             $result = $saga->execute();
 
-            // Créer l'entrée en base
-            $siteModule = $this->createSiteModuleRecord($tenant, $moduleName, $config);
+            // Créer l'entrée en base avec la version legacy si disponible
+            $siteModule = $this->createSiteModuleRecord($tenant, $moduleName, $config, $legacyResult);
 
             // Dispatcher l'event
             ModuleActivated::dispatch($siteModule, auth()->id() ?? 0);
@@ -335,27 +338,65 @@ class ModuleInstaller implements ModuleInstallerInterface
 
     /**
      * Construit la saga d'activation
+     *
+     * @param Tenant $tenant
+     * @param string $moduleName
+     * @param array $config
+     * @param array|null &$legacyResult Référence pour stocker le résultat legacy
      */
-    protected function buildActivationSaga(Tenant $tenant, string $moduleName, array $config): SagaOrchestrator
+    protected function buildActivationSaga(Tenant $tenant, string $moduleName, array $config, ?array &$legacyResult = null): SagaOrchestrator
     {
         $saga = new SagaOrchestrator();
 
-        return $saga
-            ->addStep(
-                'run_migrations',
-                fn() => $this->migrationRunner->runModuleMigrations($tenant, $moduleName),
-                fn() => $this->migrationRunner->rollbackModuleMigrations($tenant, $moduleName)
-            )
-            ->addStep(
-                'create_s3_structure',
-                fn() => $this->storageManager->createModuleStructure($tenant->site_id, $moduleName),
-                fn() => $this->storageManager->deleteModuleStructure($tenant->site_id, $moduleName)
-            )
-            ->addStep(
-                'generate_config',
-                fn() => $this->storageManager->generateModuleConfig($tenant->site_id, $moduleName, $config),
-                fn() => $this->storageManager->deleteModuleConfig($tenant->site_id, $moduleName)
+        // Step 1: Laravel migrations
+        $saga->addStep(
+            'run_migrations',
+            fn() => $this->migrationRunner->runModuleMigrations($tenant, $moduleName),
+            fn() => $this->migrationRunner->rollbackModuleMigrations($tenant, $moduleName)
+        );
+
+        // Step 2: Legacy SQL installation (schema.sql + version upgrades)
+        if ($this->legacyUpdateRunner && $this->legacyUpdateRunner->hasLegacyUpdates($moduleName)) {
+            $saga->addStep(
+                'run_legacy_install',
+                function () use ($tenant, $moduleName, &$legacyResult) {
+                    $legacyResult = $this->legacyUpdateRunner->install($tenant, $moduleName);
+                    if (!$legacyResult['success']) {
+                        throw new \RuntimeException(
+                            "Legacy installation failed: " . implode(', ', $legacyResult['errors'] ?? ['Unknown error'])
+                        );
+                    }
+                    return $legacyResult;
+                },
+                function () use ($tenant, $moduleName) {
+                    // Compensation: désinstaller les mises à jour legacy
+                    try {
+                        $this->legacyUpdateRunner->uninstall($tenant, $moduleName);
+                    } catch (\Exception $e) {
+                        $this->logError('Legacy uninstall compensation failed', [
+                            'module' => $moduleName,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+                }
             );
+        }
+
+        // Step 3: Storage structure
+        $saga->addStep(
+            'create_s3_structure',
+            fn() => $this->storageManager->createModuleStructure($tenant->site_id, $moduleName),
+            fn() => $this->storageManager->deleteModuleStructure($tenant->site_id, $moduleName)
+        );
+
+        // Step 4: Config generation
+        $saga->addStep(
+            'generate_config',
+            fn() => $this->storageManager->generateModuleConfig($tenant->site_id, $moduleName, $config),
+            fn() => $this->storageManager->deleteModuleConfig($tenant->site_id, $moduleName)
+        );
+
+        return $saga;
     }
 
     /**
@@ -369,29 +410,64 @@ class ModuleInstaller implements ModuleInstallerInterface
         // On ne peut pas "re-créer" facilement ce qui a été supprimé
         // Donc on fait attention à l'ordre et on log tout
 
-        return $saga
-            ->addStep(
-                'delete_config',
-                fn() => $this->storageManager->deleteModuleConfig($tenant->site_id, $moduleName),
-                fn() => null // Pas de compensation facile
-            )
-            ->addStep(
-                'delete_s3_structure',
-                fn() => $this->storageManager->deleteModuleStructure($tenant->site_id, $moduleName),
-                fn() => null // Pas de compensation facile
-            )
-            ->addStep(
-                'rollback_migrations',
-                fn() => $this->migrationRunner->rollbackModuleMigrations($tenant, $moduleName),
-                fn() => null // Pas de compensation facile
+        // Step 1: Delete config
+        $saga->addStep(
+            'delete_config',
+            fn() => $this->storageManager->deleteModuleConfig($tenant->site_id, $moduleName),
+            fn() => null // Pas de compensation facile
+        );
+
+        // Step 2: Delete storage structure
+        $saga->addStep(
+            'delete_s3_structure',
+            fn() => $this->storageManager->deleteModuleStructure($tenant->site_id, $moduleName),
+            fn() => null // Pas de compensation facile
+        );
+
+        // Step 3: Legacy SQL uninstallation (version downgrades + drop.sql)
+        if ($this->legacyUpdateRunner && $this->legacyUpdateRunner->hasLegacyUpdates($moduleName)) {
+            $saga->addStep(
+                'run_legacy_uninstall',
+                function () use ($tenant, $moduleName) {
+                    $result = $this->legacyUpdateRunner->uninstall($tenant, $moduleName);
+                    // Log mais ne bloque pas sur les erreurs de downgrade
+                    // Car les données sont peut-être déjà supprimées
+                    if (!$result['success']) {
+                        $this->logWarning('Legacy uninstall had errors', [
+                            'module' => $moduleName,
+                            'errors' => $result['errors'],
+                        ]);
+                    }
+                    return $result;
+                },
+                fn() => null // Pas de compensation
             );
+        }
+
+        // Step 4: Rollback Laravel migrations
+        $saga->addStep(
+            'rollback_migrations',
+            fn() => $this->migrationRunner->rollbackModuleMigrations($tenant, $moduleName),
+            fn() => null // Pas de compensation facile
+        );
+
+        return $saga;
     }
 
     /**
      * Crée ou réactive l'entrée dans t_site_modules
+     *
+     * @param Tenant $tenant
+     * @param string $moduleName
+     * @param array $config
+     * @param array|null $legacyResult Résultat de l'installation legacy (contient final_version)
      */
-    protected function createSiteModuleRecord(Tenant $tenant, string $moduleName, array $config): SiteModule
+    protected function createSiteModuleRecord(Tenant $tenant, string $moduleName, array $config, ?array $legacyResult = null): SiteModule
     {
+        // Déterminer la version installée depuis le résultat legacy
+        $installedVersion = $legacyResult['final_version'] ?? null;
+        $appliedVersions = $legacyResult ? array_keys($legacyResult['versions'] ?? []) : [];
+
         // Vérifier si le module existe déjà (potentiellement désactivé)
         $siteModule = SiteModule::forTenant($tenant->site_id)
             ->where('module_name', $moduleName)
@@ -399,22 +475,200 @@ class ModuleInstaller implements ModuleInstallerInterface
 
         if ($siteModule) {
             // Réactiver le module existant
-            $siteModule->update([
+            $updateData = [
                 'is_active' => 'YES',
                 'installed_at' => now(),
                 'uninstalled_at' => null,
                 'config' => $config,
-            ]);
+            ];
+
+            // Ajouter les infos de version si disponibles
+            if ($installedVersion) {
+                $updateData['installed_version'] = $installedVersion;
+                $updateData['version_updated_at'] = now();
+
+                // Mettre à jour l'historique
+                $history = $siteModule->version_history ?? [];
+                $history[] = [
+                    'action' => 'reactivate',
+                    'from_version' => $siteModule->installed_version,
+                    'to_version' => $installedVersion,
+                    'applied_versions' => $appliedVersions,
+                    'applied_at' => now()->toIso8601String(),
+                ];
+                $updateData['version_history'] = $history;
+            }
+
+            $siteModule->update($updateData);
             return $siteModule->fresh();
         }
 
         // Créer un nouveau module
-        return SiteModule::create([
+        $createData = [
             'site_id' => $tenant->site_id,
             'module_name' => $moduleName,
             'is_active' => 'YES',
             'installed_at' => now(),
             'config' => $config,
+        ];
+
+        // Ajouter les infos de version si disponibles
+        if ($installedVersion) {
+            $createData['installed_version'] = $installedVersion;
+            $createData['version_updated_at'] = now();
+            $createData['version_history'] = [[
+                'action' => 'install',
+                'from_version' => null,
+                'to_version' => $installedVersion,
+                'applied_versions' => $appliedVersions,
+                'applied_at' => now()->toIso8601String(),
+            ]];
+        }
+
+        return SiteModule::create($createData);
+    }
+
+    /**
+     * Met à jour un module vers une version plus récente
+     *
+     * @param Tenant $tenant
+     * @param string $moduleName
+     * @param string|null $targetVersion Version cible (null = dernière)
+     * @return array Rapport de mise à jour
+     */
+    public function upgrade(Tenant $tenant, string $moduleName, ?string $targetVersion = null): array
+    {
+        // Vérifier que le module est actif
+        $siteModule = SiteModule::forTenant($tenant->site_id)
+            ->where('module_name', $moduleName)
+            ->active()
+            ->first();
+
+        if (!$siteModule) {
+            throw new \RuntimeException("Module {$moduleName} is not active for tenant {$tenant->site_id}");
+        }
+
+        // Vérifier qu'on a le legacy runner
+        if (!$this->legacyUpdateRunner || !$this->legacyUpdateRunner->hasLegacyUpdates($moduleName)) {
+            return [
+                'success' => true,
+                'message' => 'No legacy updates available for this module',
+                'from_version' => $siteModule->installed_version,
+                'to_version' => $siteModule->installed_version,
+            ];
+        }
+
+        $currentVersion = $siteModule->installed_version;
+        $targetVersion = $targetVersion ?? $this->legacyUpdateRunner->getLatestVersion($moduleName);
+
+        // Vérifier si une mise à jour est nécessaire
+        if ($currentVersion && version_compare($currentVersion, $targetVersion, '>=')) {
+            return [
+                'success' => true,
+                'message' => 'Module is already at target version or newer',
+                'from_version' => $currentVersion,
+                'to_version' => $currentVersion,
+            ];
+        }
+
+        $this->logInfo('Starting module upgrade', [
+            'module' => $moduleName,
+            'tenant_id' => $tenant->site_id,
+            'from_version' => $currentVersion,
+            'to_version' => $targetVersion,
         ]);
+
+        // Exécuter la mise à jour
+        $result = $this->legacyUpdateRunner->upgrade(
+            $tenant,
+            $moduleName,
+            $currentVersion ?? '0.0',
+            $targetVersion
+        );
+
+        if ($result['success']) {
+            // Mettre à jour le SiteModule avec la nouvelle version
+            $siteModule->updateVersion(
+                $result['final_version'] ?? $targetVersion,
+                array_keys($result['versions'] ?? [])
+            );
+
+            $this->logInfo('Module upgrade completed', [
+                'module' => $moduleName,
+                'tenant_id' => $tenant->site_id,
+                'final_version' => $result['final_version'],
+            ]);
+        } else {
+            $this->logError('Module upgrade failed', [
+                'module' => $moduleName,
+                'tenant_id' => $tenant->site_id,
+                'errors' => $result['errors'],
+            ]);
+        }
+
+        // Invalider le cache
+        $this->cache->forgetTenant($tenant->site_id);
+
+        return $result;
+    }
+
+    /**
+     * Vérifie si un module a des mises à jour legacy disponibles
+     */
+    public function hasAvailableUpgrades(Tenant $tenant, string $moduleName): array
+    {
+        $siteModule = SiteModule::forTenant($tenant->site_id)
+            ->where('module_name', $moduleName)
+            ->active()
+            ->first();
+
+        if (!$siteModule) {
+            return [
+                'has_upgrades' => false,
+                'reason' => 'Module not active',
+            ];
+        }
+
+        if (!$this->legacyUpdateRunner || !$this->legacyUpdateRunner->hasLegacyUpdates($moduleName)) {
+            return [
+                'has_upgrades' => false,
+                'reason' => 'No legacy updates for this module',
+            ];
+        }
+
+        $currentVersion = $siteModule->installed_version;
+        $latestVersion = $this->legacyUpdateRunner->getLatestVersion($moduleName);
+
+        if (!$latestVersion) {
+            return [
+                'has_upgrades' => false,
+                'reason' => 'No versions available',
+            ];
+        }
+
+        $hasUpgrades = !$currentVersion || version_compare($currentVersion, $latestVersion, '<');
+
+        return [
+            'has_upgrades' => $hasUpgrades,
+            'current_version' => $currentVersion,
+            'latest_version' => $latestVersion,
+            'versions_behind' => $hasUpgrades
+                ? count($this->getVersionsBetween($moduleName, $currentVersion, $latestVersion))
+                : 0,
+        ];
+    }
+
+    /**
+     * Retourne les versions entre deux versions
+     */
+    protected function getVersionsBetween(string $moduleName, ?string $from, string $to): array
+    {
+        if (!$this->legacyUpdateRunner) {
+            return [];
+        }
+
+        // Utiliser la découverte via le runner
+        $discovery = app(Legacy\LegacyUpdateDiscoveryInterface::class);
+        return $discovery->getVersionsToApply($moduleName, $from, $to);
     }
 }

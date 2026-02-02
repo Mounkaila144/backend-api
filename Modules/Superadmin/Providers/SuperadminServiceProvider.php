@@ -115,10 +115,46 @@ class SuperadminServiceProvider extends ServiceProvider
             \Modules\Superadmin\Services\SagaOrchestrator::class
         );
 
-        // Bind ModuleInstaller service
+        // ===== Legacy Update System Services =====
+
+        // Bind LegacySqlImporter as singleton (for importDatabase::getInstance() compatibility)
+        $this->app->singleton(
+            \Modules\Superadmin\Services\Legacy\LegacySqlImporterInterface::class,
+            \Modules\Superadmin\Services\Legacy\LegacySqlImporter::class
+        );
+
+        // Bind LegacyUpdateDiscovery service
+        $this->app->singleton(
+            \Modules\Superadmin\Services\Legacy\LegacyUpdateDiscoveryInterface::class,
+            \Modules\Superadmin\Services\Legacy\LegacyUpdateDiscovery::class
+        );
+
+        // Bind LegacyUpdateRunner service
+        $this->app->bind(
+            \Modules\Superadmin\Services\Legacy\LegacyUpdateRunnerInterface::class,
+            function ($app) {
+                return new \Modules\Superadmin\Services\Legacy\LegacyUpdateRunner(
+                    $app->make(\Modules\Superadmin\Services\Legacy\LegacyUpdateDiscoveryInterface::class),
+                    $app->make(\Modules\Superadmin\Services\Legacy\LegacySqlImporterInterface::class)
+                );
+            }
+        );
+
+        // ===== End Legacy Update System Services =====
+
+        // Bind ModuleInstaller service with Legacy support
         $this->app->bind(
             \Modules\Superadmin\Services\ModuleInstallerInterface::class,
-            \Modules\Superadmin\Services\ModuleInstaller::class
+            function ($app) {
+                return new \Modules\Superadmin\Services\ModuleInstaller(
+                    $app->make(\Modules\Superadmin\Services\ModuleDiscoveryInterface::class),
+                    $app->make(\Modules\Superadmin\Services\ModuleDependencyResolverInterface::class),
+                    $app->make(\Modules\Superadmin\Services\TenantStorageManagerInterface::class),
+                    $app->make(\Modules\Superadmin\Services\TenantMigrationRunnerInterface::class),
+                    $app->make(\Modules\Superadmin\Services\ModuleCacheService::class),
+                    $app->make(\Modules\Superadmin\Services\Legacy\LegacyUpdateRunnerInterface::class)
+                );
+            }
         );
 
         // Bind ServiceHealthChecker as singleton

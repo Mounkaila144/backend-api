@@ -1,0 +1,1 @@
+ALTER TABLE `t_users` ADD `validation_email` varchar(255) COLLATE utf8_bin NOT NULL DEFAULT '' AFTER `email`,
