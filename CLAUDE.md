@@ -261,6 +261,60 @@ This project uses **existing database tables** with legacy schema:
 4. **Always test tenant context** - ensure tenant initialization works before accessing tenant data
 5. **Module route files** are automatically loaded - no need to register them manually
 
+## Code Quality Standards
+
+These rules come from installed skills (clean-code, api-design-principles, architecture-patterns, test-driven-development). Apply them automatically to ALL code — never wait for the user to ask.
+
+### Clean Code (skill: clean-code)
+- Intention-revealing names: `getFilteredContracts()` not `getData()`, `$elapsedDays` not `$d`
+- Functions do ONE thing, max 20 lines. If name has "and", split it
+- Early returns over nested if/else: guard clauses first, happy path last
+- No dead code: delete unused imports, variables, methods — don't comment them out
+- Don't comment bad code — rewrite it. Comments explain WHY, not WHAT
+- Small parameter lists: 0-2 ideal, 3+ needs a DTO/object
+- No hidden side effects: function name must describe ALL behavior
+- Avoid null returns: use exceptions, early returns, or default values
+- DRY: 3+ identical patterns → extract, 2 similar → leave as-is
+- No magic strings: use constants (`FIELD_PERMISSIONS`, `PERMISSION_RELATIONS`)
+
+### API Design (skill: api-design-principles)
+- Resources are nouns, plural: `/api/admin/contracts`, not `/api/admin/getContract`
+- HTTP methods map correctly: GET (read), POST (create), PUT (full replace), PATCH (partial), DELETE
+- Status codes: 200 OK, 201 Created, 204 No Content, 400 Bad, 401 Unauth, 403 Forbidden, 404 Not Found, 422 Validation
+- Consistent JSON shape: `{ success: bool, data: ..., meta?: ..., message?: ... }`
+- Pagination on ALL collections: always include `current_page`, `last_page`, `per_page`, `total`
+- Error format: `{ success: false, message: string, error?: string }` — never expose stack traces
+- Filter params: snake_case, support both single (`state_id`) and array (`in_state_id[]`)
+- Avoid deep URL nesting: max 2 levels (`/contracts/{id}/products`, not deeper)
+- Permission-gated fields: compute once in controller, pass to repository + resource
+
+### Architecture Patterns (skill: architecture-patterns)
+- Dependencies point inward: domain never imports from controllers/HTTP layer
+- Repository pattern: ALL DB queries go through `Repositories/`, never in controllers
+- Resource pattern: ALL JSON output goes through `Http/Resources/`, never raw arrays
+- Controllers are thin adapters: validate → delegate to repository/service → return resource
+- Interfaces before implementations: define contracts (`IContractRepository`) for testability
+- Entities have behavior + identity: not just data containers (avoid anemic models)
+- Eager-load only what's needed: use `$permittedFields` to skip unnecessary relations
+- Constants over config when values are code-coupled (e.g. `FIELD_PERMISSIONS`)
+- Module structure: Entities (domain) → Services (logic) → Repositories (data) → Controllers (thin HTTP)
+
+### Test-Driven Development (skill: test-driven-development)
+- RED-GREEN-REFACTOR cycle: write failing test → minimal code to pass → refactor
+- No production code without a failing test first
+- Watch the test fail to prove it tests the right thing
+- One behavior per test: split tests with "and" in their names
+- Real code in tests, mocks ONLY for external dependencies (DB, API, filesystem)
+- Never add test-only methods to production classes
+- Run tests with `php artisan test` — module tests in `Modules/{Name}/Tests/`
+
+### Security (always apply)
+- Never trust client input for authorization: always check server-side with `$request->user()->hasCredential()`
+- Superadmin bypass: check `isSuperadmin()` first in permission logic
+- SQL injection: always use Eloquent/query builder, never raw SQL with user input
+- No secrets in code: use `.env` for credentials, never hardcode
+- Validate at system boundaries only: user input and external APIs
+
 ## Related Documentation
 
 For detailed migration documentation, see `TUTORIEL_COMPLET_LARAVEL_NEXTJS_MULTITENANCY.md` in the project root.

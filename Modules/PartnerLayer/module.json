@@ -1,0 +1,11 @@
+{
+    "name": "PartnerLayer",
+    "alias": "partnerlayer",
+    "description": "Partner Layer module - manages subcontractor layer companies",
+    "keywords": ["partner", "layer", "multi-tenant"],
+    "priority": 0,
+    "providers": [
+        "Modules\\PartnerLayer\\Providers\\PartnerLayerServiceProvider"
+    ],
+    "files": []
+}

@@ -19,6 +19,7 @@ Route::prefix('api/admin')->middleware(['tenant', 'auth:sanctum'])->group(functi
         // Main contract routes
         Route::get('/contracts', [ContractController::class, 'index'])->name('contracts.index');
         Route::post('/contracts', [ContractController::class, 'store'])->name('contracts.store');
+        Route::get('/contracts/filter-options', [ContractController::class, 'filterOptions'])->name('contracts.filterOptions');
         Route::get('/contracts/statistics', [ContractController::class, 'statistics'])->name('contracts.statistics');
         Route::get('/contracts/{id}', [ContractController::class, 'show'])->name('contracts.show');
         Route::put('/contracts/{id}', [ContractController::class, 'update'])->name('contracts.update');

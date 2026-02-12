@@ -17,9 +17,24 @@ use Modules\UsersGuard\Entities\Permission;
 trait HasPermissions
 {
     /**
-     * Cached permissions for this user
+     * Cached permissions collection for this user
      */
     protected ?Collection $cachedPermissions = null;
+
+    /**
+     * Indexed permission names for O(1) lookup: ['perm_name' => true, ...]
+     */
+    protected ?array $cachedPermissionIndex = null;
+
+    /**
+     * Indexed group names for O(1) lookup: ['group_name' => true, ...]
+     */
+    protected ?array $cachedGroupIndex = null;
+
+    /**
+     * Cached superadmin status (null = not checked yet)
+     */
+    protected ?bool $cachedIsSuperadmin = null;
 
     /**
      * Check if user has specific credential(s) - Symfony 1 compatible method
@@ -51,10 +66,8 @@ trait HasPermissions
 
         // Handle Symfony-style nested arrays: [['perm1', 'perm2']] = OR logic
         if (is_array($credentials) && isset($credentials[0]) && is_array($credentials[0])) {
-            // Nested array means OR logic between groups
             foreach ($credentials as $credentialGroup) {
                 if (is_array($credentialGroup)) {
-                    // Check if user has ANY credential in this group (OR within group)
                     foreach ($credentialGroup as $credential) {
                         if ($this->checkSingleCredential($credential)) {
                             return true;
@@ -68,7 +81,6 @@ trait HasPermissions
         // Handle array of credentials
         if (is_array($credentials)) {
             if ($useAnd) {
-                // AND logic: must have ALL credentials
                 foreach ($credentials as $credential) {
                     if (!$this->checkSingleCredential($credential)) {
                         return false;
@@ -76,7 +88,6 @@ trait HasPermissions
                 }
                 return true;
             } else {
-                // OR logic: must have ANY credential
                 foreach ($credentials as $credential) {
                     if ($this->checkSingleCredential($credential)) {
                         return true;
@@ -106,7 +117,6 @@ trait HasPermissions
     public function hasGroups($groups): bool
     {
         if (is_array($groups)) {
-            // OR logic: user must have at least one group
             foreach ($groups as $group) {
                 if ($this->checkSingleGroup($group)) {
                     return true;
@@ -119,34 +129,70 @@ trait HasPermissions
     }
 
     /**
-     * Check a single credential (group OR permission) - Symfony 1 behavior
+     * Check a single credential (group OR permission) - O(1) lookup
      *
      * In Symfony 1, hasCredential() checks BOTH permissions AND groups.
-     * This method replicates that behavior for Laravel.
      */
     protected function checkSingleCredential(string $credential): bool
     {
-        // First, check if it's a GROUP name
+        // O(1) group check
         if ($this->checkSingleGroup($credential)) {
             return true;
         }
 
-        // Then, check if it's a PERMISSION name
-        $userPermissions = $this->getAllPermissions();
-        return $userPermissions->contains('name', $credential);
+        // O(1) permission check via indexed array
+        return isset($this->getPermissionIndex()[$credential]);
     }
 
     /**
-     * Check a single group membership
+     * Check a single group membership - O(1) lookup
      */
     protected function checkSingleGroup(string $groupName): bool
     {
-        if ($this->relationLoaded('groups')) {
-            return $this->groups->contains('name', $groupName);
+        return isset($this->getGroupIndex()[$groupName]);
+    }
+
+    /**
+     * Get indexed permission names for O(1) lookup
+     * Lazy-built and cached per request
+     *
+     * @return array<string, true>
+     */
+    protected function getPermissionIndex(): array
+    {
+        if ($this->cachedPermissionIndex !== null) {
+            return $this->cachedPermissionIndex;
         }
 
-        // Check in database
-        return $this->groups()->where('name', $groupName)->exists();
+        $this->cachedPermissionIndex = array_flip(
+            $this->getAllPermissions()->pluck('name')->toArray()
+        );
+
+        return $this->cachedPermissionIndex;
+    }
+
+    /**
+     * Get indexed group names for O(1) lookup
+     * Lazy-built and cached per request
+     *
+     * @return array<string, true>
+     */
+    protected function getGroupIndex(): array
+    {
+        if ($this->cachedGroupIndex !== null) {
+            return $this->cachedGroupIndex;
+        }
+
+        // Ensure groups are loaded
+        if (!$this->relationLoaded('groups')) {
+            $this->load('groups');
+        }
+
+        $this->cachedGroupIndex = array_flip(
+            $this->groups->pluck('name')->toArray()
+        );
+
+        return $this->cachedGroupIndex;
     }
 
     /**
@@ -161,11 +207,10 @@ trait HasPermissions
 
         $permissions = collect();
 
-        // Get permissions from user's groups
+        // Ensure groups + their permissions are loaded
         if (!$this->relationLoaded('groups')) {
             $this->load(['groups.permissions']);
         } else {
-            // Groups are loaded, but check if permissions are loaded
             $needsPermissions = false;
             foreach ($this->groups as $group) {
                 if (!$group->relationLoaded('permissions')) {
@@ -178,7 +223,7 @@ trait HasPermissions
             }
         }
 
-        // Now merge all permissions from groups
+        // Merge all permissions from groups
         foreach ($this->groups as $group) {
             if ($group->relationLoaded('permissions')) {
                 $permissions = $permissions->merge($group->permissions);
@@ -186,13 +231,10 @@ trait HasPermissions
         }
 
         // Get direct permissions assigned to user
-        if ($this->relationLoaded('permissions')) {
-            $permissions = $permissions->merge($this->permissions);
-        } else {
-            // Load direct permissions if not already loaded
+        if (!$this->relationLoaded('permissions')) {
             $this->load('permissions');
-            $permissions = $permissions->merge($this->permissions);
         }
+        $permissions = $permissions->merge($this->permissions);
 
         // Remove duplicates by ID
         $this->cachedPermissions = $permissions->unique('id');
@@ -209,21 +251,21 @@ trait HasPermissions
     }
 
     /**
-     * Check if user is superadmin
+     * Check if user is superadmin - cached per request
      */
     public function isSuperadmin(): bool
     {
-        // Check if user has superadmin group
-        if ($this->relationLoaded('groups')) {
-            return $this->groups->contains('name', 'superadmin');
+        if ($this->cachedIsSuperadmin !== null) {
+            return $this->cachedIsSuperadmin;
         }
 
-        // Check in database
-        return $this->groups()->where('name', 'superadmin')->exists();
+        $this->cachedIsSuperadmin = isset($this->getGroupIndex()['superadmin']);
+
+        return $this->cachedIsSuperadmin;
     }
 
     /**
-     * Check if user is admin
+     * Check if user is admin - cached per request
      */
     public function isAdmin(): bool
     {
@@ -231,19 +273,18 @@ trait HasPermissions
             return true;
         }
 
-        if ($this->relationLoaded('groups')) {
-            return $this->groups->contains('name', 'admin');
-        }
-
-        return $this->groups()->where('name', 'admin')->exists();
+        return isset($this->getGroupIndex()['admin']);
     }
 
     /**
-     * Clear cached permissions
+     * Clear all cached permission/group data
      */
     public function clearPermissionCache(): void
     {
         $this->cachedPermissions = null;
+        $this->cachedPermissionIndex = null;
+        $this->cachedGroupIndex = null;
+        $this->cachedIsSuperadmin = null;
     }
 
     /**

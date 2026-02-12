@@ -94,34 +94,11 @@ class ContractResource extends JsonResource
 
             // Status
             'state_id' => $this->state_id,
-            'contract_status' => $this->whenLoaded('contractStatus', function () {
-                return [
-                    'id' => $this->contractStatus->id,
-                    'name' => $this->contractStatus->name,
-                    'color' => $this->contractStatus->color,
-                    'icon' => $this->contractStatus->icon,
-                ];
-            }),
-
+            'contract_status' => $this->formatStatus('contractStatus'),
             'install_state_id' => $this->install_state_id,
-            'install_status' => $this->whenLoaded('installStatus', function () {
-                return $this->installStatus ? [
-                    'id' => $this->installStatus->id,
-                    'name' => $this->installStatus->name,
-                    'color' => $this->installStatus->color,
-                    'icon' => $this->installStatus->icon,
-                ] : null;
-            }),
-
+            'install_status' => $this->formatStatus('installStatus'),
             'admin_status_id' => $this->admin_status_id,
-            'admin_status' => $this->whenLoaded('adminStatus', function () {
-                return $this->adminStatus ? [
-                    'id' => $this->adminStatus->id,
-                    'name' => $this->adminStatus->name,
-                    'color' => $this->adminStatus->color,
-                    'icon' => $this->adminStatus->icon,
-                ] : null;
-            }),
+            'admin_status' => $this->formatStatus('adminStatus'),
 
             // Financial
             'total_price_with_taxe' => (float) $this->total_price_with_taxe,
@@ -136,47 +113,41 @@ class ContractResource extends JsonResource
             'is_signed' => $this->is_signed,
             'status_flag' => $this->getAttribute('status'), // ACTIVE or DELETE
 
-            // Products
-            'products' => $this->whenLoaded('products', function () {
-                return $this->products->map(function ($product) {
-                    return [
-                        'id' => $product->id,
-                        'product_id' => $product->product_id,
-                        'details' => $product->details,
-                        'product' => $product->relationLoaded('product') ? $product->product : null,
-                    ];
-                });
-            }),
+            'products' => $this->whenLoaded('products', fn () => $this->products->map(fn ($p) => [
+                'id' => $p->id,
+                'product_id' => $p->product_id,
+                'details' => $p->details,
+                'product' => $p->relationLoaded('product') ? $p->product : null,
+            ])),
 
-            // History
-            'history' => $this->whenLoaded('history', function () {
-                return $this->history->map(function ($h) {
-                    return [
-                        'id' => $h->id,
-                        'user_id' => $h->user_id,
-                        'user_application' => $h->user_application,
-                        'history' => $h->history,
-                        'created_at' => $h->created_at->format('Y-m-d H:i:s'),
-                    ];
-                });
-            }),
+            'history' => $this->whenLoaded('history', fn () => $this->history->map(fn ($h) => [
+                'id' => $h->id,
+                'user_id' => $h->user_id,
+                'user_application' => $h->user_application,
+                'history' => $h->history,
+                'created_at' => $h->created_at->format('Y-m-d H:i:s'),
+            ])),
 
-            // Contributors
-            'contributors' => $this->whenLoaded('contributors', function () {
-                return $this->contributors->map(function ($c) {
-                    return [
-                        'id' => $c->id,
-                        'type' => $c->type,
-                        'user_id' => $c->user_id,
-                        'attribution_id' => $c->attribution_id,
-                        'user' => $c->relationLoaded('user') ? $c->user : null,
-                    ];
-                });
-            }),
+            'contributors' => $this->whenLoaded('contributors', fn () => $this->contributors->map(fn ($c) => [
+                'id' => $c->id,
+                'type' => $c->type,
+                'user_id' => $c->user_id,
+                'attribution_id' => $c->attribution_id,
+                'user' => $c->relationLoaded('user') ? $c->user : null,
+            ])),
 
-            // Timestamps
             'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
             'updated_at' => $this->updated_at?->format('Y-m-d H:i:s'),
         ];
+    }
+
+    protected function formatStatus(string $relation): mixed
+    {
+        return $this->whenLoaded($relation, fn () => $this->$relation ? [
+            'id' => $this->$relation->id,
+            'name' => $this->$relation->name,
+            'color' => $this->$relation->color,
+            'icon' => $this->$relation->icon,
+        ] : null);
     }
 }

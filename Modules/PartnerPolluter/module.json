@@ -1,0 +1,11 @@
+{
+    "name": "PartnerPolluter",
+    "alias": "partnerpolluter",
+    "description": "Partner Polluter module - manages polluter companies (CEE)",
+    "keywords": ["partner", "polluter", "multi-tenant"],
+    "priority": 0,
+    "providers": [
+        "Modules\\PartnerPolluter\\Providers\\PartnerPolluterServiceProvider"
+    ],
+    "files": []
+}
