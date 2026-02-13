@@ -3,6 +3,7 @@
 namespace Modules\CustomersContracts\Http\Resources;
 
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\CustomersContracts\Services\ContractSettingsService;
 
 /**
  * Contract List Resource - Optimized for table/list display
@@ -261,6 +262,23 @@ class ContractListResource extends JsonResource
         // Permission-gated energy class (domoprime)
         if (static::can('class_energy')) {
             $data['class_energy'] = $this->getVariableValue('class_energy');
+        }
+
+        // Computed state flags for frontend toggle display
+        // Wrapped in try/catch: if settings table is missing or empty, default to false
+        try {
+            $settings = app(ContractSettingsService::class);
+            $cancelStatusId = $settings->getStatusForCancel();
+            $blowingStatusId = $settings->getStatusForBlowing();
+            $placementStatusId = $settings->getStatusForPlacement();
+
+            $data['is_cancelled'] = $cancelStatusId && $this->state_id === $cancelStatusId;
+            $data['is_blowing'] = $blowingStatusId && $this->state_id === $blowingStatusId;
+            $data['is_placement'] = $placementStatusId && $this->state_id === $placementStatusId;
+        } catch (\Throwable $e) {
+            $data['is_cancelled'] = false;
+            $data['is_blowing'] = false;
+            $data['is_placement'] = false;
         }
 
         return $data;

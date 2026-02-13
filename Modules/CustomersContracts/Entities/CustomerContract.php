@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Customer\Entities\Customer;
+use Modules\CustomersContracts\Services\ContractSettingsService;
 use Modules\Partner\Entities\Partner;
 use Modules\PartnerLayer\Entities\PartnerLayerCompany;
 use Modules\PartnerPolluter\Entities\PartnerPolluterCompany;
@@ -362,5 +363,207 @@ class CustomerContract extends Model
     public function setVariablesArrayAttribute($value)
     {
         $this->attributes['variables'] = is_array($value) ? json_encode($value) : $value;
+    }
+
+    // ─── State Checks ────────────────────────────────────────
+
+    public function isHold(): bool
+    {
+        return $this->is_hold === 'YES';
+    }
+
+    public function isConfirmed(): bool
+    {
+        return $this->is_confirmed === 'YES';
+    }
+
+    public function isHoldAdmin(): bool
+    {
+        return $this->is_hold_admin === 'YES';
+    }
+
+    public function isHoldQuote(): bool
+    {
+        return $this->is_hold_quote === 'YES';
+    }
+
+    public function hasPolluter(): bool
+    {
+        return $this->polluter_id !== null;
+    }
+
+    // ─── State Transitions ───────────────────────────────────
+
+    public function setConfirmed(ContractSettingsService $settings): self
+    {
+        $this->is_confirmed = 'YES';
+
+        $statusId = $settings->getStatusForConfirm();
+
+        if ($statusId) {
+            $this->state_id = $statusId;
+        }
+
+        $this->save();
+
+        return $this;
+    }
+
+    public function setUnconfirmed(ContractSettingsService $settings): self
+    {
+        $this->is_confirmed = 'NO';
+
+        $statusId = $settings->getStatusForUnconfirm();
+
+        if ($statusId) {
+            $this->state_id = $statusId;
+        }
+
+        $this->save();
+
+        return $this;
+    }
+
+    public function setCancelled(ContractSettingsService $settings): self
+    {
+        $statusId = $settings->getStatusForCancel();
+
+        if ($statusId) {
+            $this->state_id = $statusId;
+        }
+
+        $this->save();
+
+        return $this;
+    }
+
+    public function setUncancelled(ContractSettingsService $settings): self
+    {
+        $statusId = $settings->getStatusForUncancel();
+
+        if ($statusId) {
+            $this->state_id = $statusId;
+        }
+
+        $this->save();
+
+        return $this;
+    }
+
+    public function setBlowing(ContractSettingsService $settings): self
+    {
+        $statusId = $settings->getStatusForBlowing();
+
+        if ($statusId) {
+            $this->state_id = $statusId;
+        }
+
+        $this->save();
+
+        return $this;
+    }
+
+    public function setUnblowing(ContractSettingsService $settings): self
+    {
+        $statusId = $settings->getStatusForUnblowing();
+
+        if ($statusId) {
+            $this->state_id = $statusId;
+        }
+
+        $this->save();
+
+        return $this;
+    }
+
+    public function setPlacement(ContractSettingsService $settings): self
+    {
+        $statusId = $settings->getStatusForPlacement();
+
+        if ($statusId) {
+            $this->state_id = $statusId;
+        }
+
+        $this->save();
+
+        return $this;
+    }
+
+    public function setUnplacement(ContractSettingsService $settings): self
+    {
+        $statusId = $settings->getStatusForUnplacement();
+
+        if ($statusId) {
+            $this->state_id = $statusId;
+        }
+
+        $this->save();
+
+        return $this;
+    }
+
+    public function setHold(): self
+    {
+        $this->update(['is_hold' => 'YES']);
+
+        return $this;
+    }
+
+    public function setUnhold(): self
+    {
+        $this->update(['is_hold' => 'NO']);
+
+        return $this;
+    }
+
+    public function setHoldAdmin(): self
+    {
+        $this->update(['is_hold_admin' => 'YES']);
+
+        return $this;
+    }
+
+    public function setUnholdAdmin(): self
+    {
+        $this->update(['is_hold_admin' => 'NO']);
+
+        return $this;
+    }
+
+    public function setHoldQuote(): self
+    {
+        $this->update(['is_hold_quote' => 'YES']);
+
+        return $this;
+    }
+
+    public function setUnholdQuote(): self
+    {
+        $this->update(['is_hold_quote' => 'NO']);
+
+        return $this;
+    }
+
+    /**
+     * Duplicate contract with its products.
+     */
+    public function copy(): self
+    {
+        $newContract = $this->replicate();
+        $newContract->reference = '';
+        $newContract->is_confirmed = 'NO';
+        $newContract->is_hold = 'NO';
+        $newContract->is_hold_admin = 'NO';
+        $newContract->is_hold_quote = 'NO';
+        $newContract->save();
+
+        foreach ($this->products as $product) {
+            $newContract->products()->create([
+                'product_id' => $product->product_id,
+                'details' => $product->details,
+            ]);
+        }
+
+        return $newContract;
     }
 }

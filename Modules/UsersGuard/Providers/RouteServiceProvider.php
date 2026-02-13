@@ -38,17 +38,14 @@ class RouteServiceProvider extends ServiceProvider
     protected function mapApiRoutes(): void
     {
         Route::prefix('api')
-            ->middleware('api')
             ->namespace($this->moduleNamespace)
             ->group(module_path('UsersGuard', '/Routes/admin.php'));
 
         Route::prefix('api')
-            ->middleware('api')
             ->namespace($this->moduleNamespace)
             ->group(module_path('UsersGuard', '/Routes/superadmin.php'));
 
         Route::prefix('api')
-            ->middleware('api')
             ->namespace($this->moduleNamespace)
             ->group(module_path('UsersGuard', '/Routes/frontend.php'));
     }
