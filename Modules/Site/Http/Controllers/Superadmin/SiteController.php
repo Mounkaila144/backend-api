@@ -294,6 +294,33 @@ class SiteController extends Controller
     }
 
     /**
+     * Activer un site en exécutant les migrations tenant
+     * POST /api/superadmin/sites/{id}/activate
+     */
+    public function activate($id): JsonResponse
+    {
+        $site = $this->siteRepository->findOrFail($id);
+        $result = $this->siteRepository->runTenantMigrations($site);
+
+        if ($result['success']) {
+            $site = $this->siteRepository->findOrFail($id);
+
+            return response()->json([
+                'success' => true,
+                'message' => $result['message'],
+                'data' => new SiteResource($site),
+                'output' => $result['output'] ?? null,
+            ]);
+        }
+
+        return response()->json([
+            'success' => false,
+            'message' => $result['message'],
+            'output' => $result['output'] ?? null,
+        ], 500);
+    }
+
+    /**
      * Activer/désactiver globalement les sites
      * POST /api/superadmin/sites/toggle-availability
      */

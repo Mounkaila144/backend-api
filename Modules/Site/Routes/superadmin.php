@@ -26,6 +26,7 @@ Route::prefix('api/superadmin')->middleware(['auth:sanctum'])->group(function ()
         Route::delete('{id}', [SiteController::class, 'destroy'])->name('destroy');
 
         // Actions spécifiques
+        Route::post('{id}/activate', [SiteController::class, 'activate'])->name('activate');
         Route::post('{id}/test-connection', [SiteController::class, 'testConnection'])->name('test-connection');
         Route::post('{id}/update-size', [SiteController::class, 'updateDatabaseSize'])->name('update-size');
     });

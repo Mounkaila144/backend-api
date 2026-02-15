@@ -5,6 +5,7 @@ namespace Modules\Site\Repositories;
 use App\Models\Tenant;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -448,6 +449,66 @@ class SiteRepository
 
         // Option 2: Copier depuis un tenant existant (template)
         // Vous pouvez implémenter cette logique selon vos besoins
+    }
+
+    /**
+     * Exécuter les migrations tenant et activer le site
+     *
+     * @return array{success: bool, message: string, output?: string}
+     */
+    public function runTenantMigrations(Tenant $site): array
+    {
+        try {
+            $exitCode = Artisan::call('tenants:migrate', [
+                '--tenants' => [$site->site_id],
+                '--force' => true,
+            ]);
+
+            $output = Artisan::output();
+
+            if ($exitCode === 0) {
+                DB::connection('mysql')
+                    ->table('t_sites')
+                    ->where('site_id', $site->site_id)
+                    ->update([
+                        'site_available' => 'YES',
+                        'site_admin_available' => 'YES',
+                        'site_frontend_available' => 'YES',
+                        'is_uptodate' => 'YES',
+                    ]);
+
+                return [
+                    'success' => true,
+                    'message' => 'Migrations exécutées avec succès. Site activé.',
+                    'output' => $output,
+                ];
+            }
+
+            DB::connection('mysql')
+                ->table('t_sites')
+                ->where('site_id', $site->site_id)
+                ->update([
+                    'is_uptodate' => 'NO',
+                ]);
+
+            return [
+                'success' => false,
+                'message' => 'Les migrations ont échoué.',
+                'output' => $output,
+            ];
+        } catch (\Exception $e) {
+            DB::connection('mysql')
+                ->table('t_sites')
+                ->where('site_id', $site->site_id)
+                ->update([
+                    'is_uptodate' => 'NO',
+                ]);
+
+            return [
+                'success' => false,
+                'message' => 'Erreur lors de l\'exécution des migrations: ' . $e->getMessage(),
+            ];
+        }
     }
 
     /**

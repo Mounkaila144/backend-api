@@ -25,6 +25,9 @@ class SiteListResource extends JsonResource
             'available' => $this->site_available === 'YES',
             'is_customer' => $this->is_customer === 'YES',
             'company' => $this->site_company,
+            'is_uptodate' => $this->is_uptodate === 'YES',
+            'admin_available' => $this->site_admin_available === 'YES',
+            'frontend_available' => $this->site_frontend_available === 'YES',
             'last_connection' => $this->last_connection?->toIso8601String(),
         ];
     }

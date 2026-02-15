@@ -64,14 +64,14 @@ class Tenant extends BaseTenant implements TenantWithDatabase
         'price',
         'site_db_size',
         'site_size',
-        'last_connection',
+        'site_last_connection',
     ];
 
     /**
      * Cast des types
      */
     protected $casts = [
-        'last_connection' => 'datetime',
+        'site_last_connection' => 'datetime',
         'price' => 'decimal:2',
         'site_db_size' => 'integer',
         'site_size' => 'integer',
@@ -84,6 +84,20 @@ class Tenant extends BaseTenant implements TenantWithDatabase
     public function database(): \Stancl\Tenancy\DatabaseConfig
     {
         return new CustomDatabaseConfig($this);
+    }
+
+    /**
+     * Stancl Tenancy uses this to resolve tenants in artisan commands (--tenants flag).
+     * Must match our primary key column.
+     */
+    public function getTenantKeyName(): string
+    {
+        return 'site_id';
+    }
+
+    public function getTenantKey()
+    {
+        return $this->getAttribute($this->getTenantKeyName());
     }
 
     /**
