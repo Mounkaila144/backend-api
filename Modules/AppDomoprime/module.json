@@ -1,0 +1,11 @@
+{
+    "name": "AppDomoprime",
+    "alias": "appdomoprime",
+    "description": "AppDomoprime module - Domoprime calculations, quotations, billings, and assets with multi-tenant support",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\AppDomoprime\\Providers\\AppDomoprimeServiceProvider"
+    ],
+    "files": []
+}
