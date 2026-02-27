@@ -4,6 +4,7 @@ namespace Modules\CustomersContracts\Repositories;
 
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Modules\CustomersContracts\Entities\CustomerContract;
 use Modules\CustomersContracts\Entities\CustomerContractHistory;
 
@@ -59,6 +60,7 @@ class ContractRepository
         'company'           => 'company:id,name',
         'campaign'          => 'campaign',
         'contributor'       => 'contributors.user',
+        'prime_renov'       => 'customer.primerenov',
     ];
 
     public function getFilteredContracts(array $filters, int $perPage = 100, array $permittedFields = []): LengthAwarePaginator
@@ -92,13 +94,23 @@ class ContractRepository
             'installerUser:id,firstname,lastname',
             'tax:id,rate',
             'products',
+            'domoprimeIsoRequest.pricing:id,name',
         ];
 
         // If no permission filtering, load all relations (backward compat)
         $permittedIndex = ! empty($permittedFields) ? array_flip($permittedFields) : [];
         $loadAll = empty($permittedIndex);
 
+        // Skip relations whose tables don't exist (optional modules not installed for this tenant)
+        $skipRelations = [];
+        if (! Schema::hasTable('t_service_primerenov_customer')) {
+            $skipRelations['prime_renov'] = true;
+        }
+
         foreach (self::PERMISSION_RELATIONS as $permKey => $relation) {
+            if (isset($skipRelations[$permKey])) {
+                continue;
+            }
             if ($loadAll || isset($permittedIndex[$permKey])) {
                 // Status relations need a language-filtered sub-query
                 if (str_contains($relation, '.translations')) {

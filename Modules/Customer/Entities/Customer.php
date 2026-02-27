@@ -124,6 +124,14 @@ class Customer extends Model
     }
 
     /**
+     * Get the prime rénov record for the customer.
+     */
+    public function primerenov(): HasOne
+    {
+        return $this->hasOne(\Modules\ServicesPrimerenov\Entities\ServicePrimeRenovCustomer::class, 'customer_id');
+    }
+
+    /**
      * Get the union that the customer belongs to.
      */
     public function union(): BelongsTo

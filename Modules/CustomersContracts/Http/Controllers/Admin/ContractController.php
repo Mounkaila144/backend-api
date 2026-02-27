@@ -22,13 +22,28 @@ class ContractController extends Controller
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
-        $permittedFields = ContractListResource::resolvePermittedFields($user);
-        ContractListResource::setPermittedFields($permittedFields);
 
+        // Data permissions: gates which fields are included in the JSON response
+        // These use FIELD_PERMISSIONS (data-level credentials like 'contract_list_view_partner')
+        $dataPermissions = ContractListResource::resolvePermittedFields($user);
+        ContractListResource::setPermittedFields($dataPermissions);
+
+        // Column visibility: determines which columns the frontend renders.
+        // Uses HEADER-level credentials from Symfony template (different from data-level).
+        // Example: header uses 'contract_view_list_partner', data uses 'contract_list_view_partner'.
+        $visibleColumns = ContractListResource::resolveVisibleColumns($user);
+
+        // permitted_fields = always-visible columns + header-visible columns
+        $permittedFields = array_values(array_unique(
+            array_merge(ContractListResource::ALWAYS_VISIBLE_COLUMNS, $visibleColumns)
+        ));
+
+        // Always load ALL relations: canField() uses isAuthorized() (per-row ownership)
+        // so any user might need relations beyond their global $dataPermissions.
         $contracts = $this->repository->getFilteredContracts(
             $request->all(),
             $request->integer('per_page', 15),
-            $permittedFields
+            array_keys(ContractListResource::FIELD_PERMISSIONS)
         );
 
         return response()->json([

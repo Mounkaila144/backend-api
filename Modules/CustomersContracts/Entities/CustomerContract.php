@@ -13,6 +13,9 @@ use Modules\PartnerPolluter\Entities\PartnerPolluterCompany;
 use Modules\Product\Entities\Tax;
 use Modules\User\Entities\UserTeam;
 use Modules\UsersGuard\Entities\User;
+use Modules\AppDomoprime\Entities\DomoprimeIsoCustomerRequest;
+use Modules\AppDomoprime\Entities\DomoprimeQuotation;
+use Modules\AppDomoprime\Entities\DomoprimeCalculation;
 
 /**
  * CustomerContract Model (TENANT DATABASE)

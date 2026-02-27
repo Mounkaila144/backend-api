@@ -14,53 +14,62 @@ use Modules\CustomersContracts\Services\ContractSettingsService;
  */
 class ContractListResource extends JsonResource
 {
-    /** ses champs sont des chec
-     * Permission key → Symfony credential name
-     * Maps each field group to the credential required to view it.
+    /**
+     * Permission key → credential(s) required to see the data.
+     *
+     * String value = single credential check.
+     * Array value  = OR logic (user needs ANY ONE of the listed credentials).
+     *
+     * Matches the Symfony template pattern:
+     *   {if $item->isAuthorized() || $user->hasCredential([['cred1','cred2',...]])}
      */
     public const FIELD_PERMISSIONS = [
         'id'                => 'contract_view_list_id',
-        'customer'          => 'contract_list_view_sale2',
-        'customer_phone'    => 'contract_list_view_phone',
-        'customer_postcode' => 'contract_list_view_postcode',
-        'customer_city'     => 'contract_list_view_city',
-        'opened_at'         => 'contract_list_opened_at',
-        'opc_at'            => 'contract_list_opc_at',
-        'sav_at'            => 'contract_list_view_sav_at',
-        'apf_at'            => 'contract_list_apf_at',
-        'payment_at'        => 'contract_list_payment_at',
-        'closed_at'         => 'contract_list_closed_at',
-        'pre_meeting_at'    => 'contract_list_view_pre_meeting_at',
-        'telepro'           => 'contract_list_view_telepro',
-        'sale1'             => 'contract_list_view_sale1',
-        'sale2'             => 'contract_list_view_sale2',
-        'assistant'         => 'contract_list_view_assistant',
-        'team'              => 'contract_view_list_team',
-        'financial_partner' => 'contract_view_list_partner',
-        'partner_layer'     => 'contract_view_list_partner_layer',
-        'polluter'          => 'contract_view_list_polluter',
-        'company'           => 'contract_list_company',
-        'campaign'          => 'contract_list_campaign',
+        'customer'          => 'contract_list_view_lastname',       // tpl:929
+        'customer_phone'    => 'contract_list_view_phone',          // tpl:998
+        'customer_postcode' => 'contract_list_view_postcode',       // tpl:1020
+        'customer_city'     => 'contract_list_view_city',           // tpl:1029
+        'opened_at'         => 'contract_list_opened_at',           // tpl:846
+        'opc_at'            => 'contract_list_opc_at',              // tpl:850
+        'sav_at'            => 'contract_list_view_sav_at',         // tpl:898
+        'apf_at'            => 'contract_list_apf_at',              // tpl:888
+        'payment_at'        => 'contract_list_payment_at',          // tpl:893
+        'closed_at'         => 'contract_list_closed_at',           // tpl:920
+        'pre_meeting_at'    => 'contract_list_view_pre_meeting_at', // tpl:873
+        'telepro'           => 'contract_list_view_telepro',        // tpl:1211
+        'sale1'             => 'contract_list_view_sale1',          // tpl:1165
+        'sale2'             => 'contract_list_view_sale2',          // tpl:1188
+        'assistant'         => 'contract_list_view_assistant',      // tpl:1227
+        'team'              => 'contract_list_view_team',           // tpl:1342
+        'financial_partner' => 'contract_list_view_partner',        // tpl:1241
+        'partner_layer'     => 'contract_list_view_partner_layer',  // tpl:1255
+        'polluter'          => 'contract_list_view_polluter',       // tpl:1331
+        'company'           => 'contract_list_company',             // tpl:930
+        'campaign'          => 'contract_list_campaign',            // tpl:970
         'creator'           => 'contract_list_created_by',
         'contributor'       => 'contract_list_attributions',
         'contract_status'   => 'contract_list_view_state',
         'install_status'    => 'contract_list_view_install_state',
-        'admin_status'      => 'contract_view_list_admin_status',
-        'opc_status'        => 'contract_view_list_opc_status',
-        'time_status'       => 'contract_view_list_time_state',
-        'is_confirmed'      => 'contract_view_list_confirmed',
-        'is_hold'           => 'contract_view_list_hold',
+        'admin_status'      => 'contract_list_view_admin_status',   // tpl:1291
+        'opc_status'        => 'contract_list_view_opc_status',     // tpl:1266
+        'time_status'       => 'contract_list_view_time_state',     // tpl:1311
+        'is_confirmed'      => 'contract_list_view_confirmed',      // tpl:1360
+        'is_hold'           => 'contract_view_list_hold',           // tpl:1373
         'is_hold_quote'     => 'contract_view_list_hold_quote',
         'is_document'       => 'contract_list_change_is_document',
         'is_photo'          => 'contract_list_change_is_photo',
         'is_quality'        => 'contract_list_change_is_quality',
         'status'            => 'contract_list_view_status',
-        'surface_top'       => 'app_domoprime_iso_contract_list_surface_101',
-        'surface_wall'      => 'app_domoprime_iso_contract_list_surface_102',
-        'surface_floor'     => 'app_domoprime_iso_contract_list_surface_103',
-        'surface_parcel'    => 'app_domoprime_iso_contract_list_surface_parcel',
-        'pricing'           => 'contract_list_pricing',
-        'class_energy'      => 'contract_list_calculation_class_pager',
+        // Surfaces: require explicit superadmin_debug permission (not auto-granted to superadmins)
+        'surface_top'       => ['superadmin_debug'],    // tpl:139
+        'surface_wall'      => ['superadmin_debug'],    // tpl:152
+        'surface_floor'     => ['superadmin_debug'],    // tpl:167
+        'surface_parcel'    => 'app_domoprime_iso_contract_list_surface_parcel',  // tpl:182
+        'pricing'           => 'contract_list_pricing',             // tpl:1036
+        'class_energy'      => 'contract_list_calculation_class_pager', // tpl:946
+        'prime_renov'        => 'services_primerenov_list',             // tpl:1058
+        'prime_renov_state1' => 'services_primerenov_list',             // tpl:1069
+        'prime_renov_state2' => 'services_primerenov_list',             // tpl:1081
     ];
 
     /**
@@ -80,22 +89,125 @@ class ContractListResource extends JsonResource
     }
 
     /**
-     * Resolve which field keys the user is allowed to see.
-     * Superadmins get all keys. Other users are checked per credential.
+     * Columns always visible in the frontend regardless of credentials.
+     * In Symfony, these use $formFilter->hasColumn() (always true for configured columns)
+     * or have no credential gate at all. Note: some hasValidator() checks are
+     * INDIRECT permission gates (the form only adds the validator if the user has
+     * a specific credential) — those go in COLUMN_HEADER_PERMISSIONS instead.
+     */
+    public const ALWAYS_VISIBLE_COLUMNS = [
+        'date',              // tpl:20  - $formFilter->hasColumn('date')
+        'customer',          // tpl:29  - $formFilter->hasColumn('customer')
+        'company',           // tpl:45  - $formFilter->hasColumn('company_id')
+        'campaign',          // tpl:52  - $formFilter->hasColumn('campaign_id')
+        'is_billable',       // tpl:59  - $formFilter->hasColumn('is_billable')
+        'customer_phone',    // tpl:77  - $formFilter->hasColumn('phone')
+        'customer_postcode', // tpl:87  - $formFilter->hasColumn('postcode')
+        'customer_city',     // tpl:97  - $formFilter->hasColumn('city')
+        'pricing',           // tpl:107 - $formFilter->hasColumn('pricing_id')
+        'surface_home',      // tpl:115 - no credential
+        'montant_ttc',       // tpl:374 - $formFilter->hasColumn('amount')
+        'telepro',           // tpl:206 - hasValidator always true (no credential gate in form)
+        'contract_status',   // tpl:346 - $formFilter->hasColumn('state')
+    ];
+
+    /**
+     * Header-level credential checks that control column VISIBILITY in the frontend.
+     * These match the hasCredential() checks on <th> elements in the Symfony template.
      *
-     * @return string[]  List of permitted field keys
+     * IMPORTANT: These are DIFFERENT from FIELD_PERMISSIONS (data-level credentials).
+     * Example: header uses 'contract_view_list_partner', data uses 'contract_list_view_partner'.
+     *
+     * Format:
+     *   Nested array [['cred1','cred2']] = standard hasCredential OR check (superadmin auto-granted)
+     *   Flat array ['cred1']             = explicit-only check (NO superadmin bypass)
+     */
+    public const COLUMN_HEADER_PERMISSIONS = [
+        'id'                 => [['superadmin', 'admin', 'contract_view_list_id']],                                           // tpl:8
+        'class_energy'       => [['app_domoprime_iso_contract_list_filter_header_class', 'contract_list_calculation_class_pager']], // tpl:38
+        'prime_renov'        => [['superadmin', 'services_primerenov_list']],                                                  // tpl:125
+        'prime_renov_state1' => [['superadmin', 'services_primerenov_list']],                                                  // tpl:130
+        'prime_renov_state2' => [['superadmin', 'services_primerenov_list']],                                                  // tpl:134
+        'surface_top'        => ['superadmin_debug'],                                                                          // tpl:139 - explicit only
+        'surface_wall'       => ['superadmin_debug'],                                                                          // tpl:152 - explicit only
+        'surface_floor'      => ['superadmin_debug'],                                                                          // tpl:167 - explicit only
+        'surface_parcel'     => [['superadmin', 'app_domoprime_iso_contract_list_surface_parcel']],                             // tpl:182
+        'sale1'              => [['superadmin', 'admin', 'contract_list_view_sale1']],                                          // tpl:190
+        'sale2'              => [['superadmin', 'admin', 'contract_list_view_sale2']],                                          // tpl:198
+        'assistant'          => [['superadmin', 'admin', 'contract_view_list_assistant', 'contract_list_display_assistant']],    // tpl:215
+        'financial_partner'  => [['superadmin', 'admin', 'contract_view_list_partner']],                                        // tpl:223
+        'partner_layer'      => [['superadmin', 'admin', 'contract_view_list_partner_layer']],                                  // tpl:231
+        'opc_status'         => [['superadmin', 'admin', 'contract_view_list_opc_status']],                                     // tpl:243
+        'admin_status'       => [['superadmin', 'admin', 'contract_view_list_admin_status']],                                   // tpl:251
+        'time_status'        => [['superadmin', 'contract_view_list_time_state']],                                              // tpl:259
+        'polluter'           => [['superadmin', 'admin', 'contract_view_list_polluter']],                                       // tpl:267
+        'team'               => [['superadmin', 'admin', 'contract_view_list_team', 'contract_list_display_team']],             // tpl:275
+        'is_confirmed'       => [['superadmin', 'contract_view_list_confirmed']],                                               // tpl:288
+        'is_hold'            => [['superadmin', 'admin', 'contract_view_list_hold']],                                           // tpl:296
+        'is_hold_quote'      => [['superadmin', 'contract_view_list_hold_quote']],                                              // tpl:304
+        'is_document'        => [['superadmin', 'contract_list_is_document']],                                                  // form:479 - validator gate
+        'is_photo'           => [['superadmin', 'contract_list_is_photo']],                                                     // form:484 - validator gate
+        'is_quality'         => [['superadmin', 'contract_list_is_quality']],                                                   // form:489 - validator gate
+        'creator'            => [['superadmin', 'contract_list_created_by']],                                                   // form:447 - validator gate
+        'install_status'     => [['superadmin', 'contract_list_install_state']],                                                // tpl:352
+        'status'             => [['superadmin', 'admin', 'contract_list_status']],                                              // tpl:360
+    ];
+
+    /**
+     * Resolve which columns are VISIBLE based on header-level credentials.
+     * Used to build the permitted_fields list sent to the frontend.
+     */
+    public static function resolveVisibleColumns($user): array
+    {
+        $visible = [];
+
+        foreach (self::COLUMN_HEADER_PERMISSIONS as $key => $credentials) {
+            if (isset($credentials[0]) && is_array($credentials[0])) {
+                // Nested array: standard hasCredential format [['cred1', 'cred2']]
+                // Superadmin auto-bypass applies (via hasCredential)
+                if ($user->hasCredential($credentials)) {
+                    $visible[] = $key;
+                }
+            } else {
+                // Flat array: explicit-only credentials (NO superadmin bypass)
+                // Used for superadmin_debug which must be explicitly assigned
+                foreach ($credentials as $cred) {
+                    if ($user->hasExplicitCredential($cred)) {
+                        $visible[] = $key;
+                        break;
+                    }
+                }
+            }
+        }
+
+        return $visible;
+    }
+
+    /**
+     * Resolve which field keys control data visibility (used by setPermittedFields / can()).
+     * This gates what DATA is included in the JSON response.
      */
     public static function resolvePermittedFields($user): array
     {
-        // Superadmin bypass — all fields permitted
-        if ($user->isSuperadmin()) {
-            return array_keys(self::FIELD_PERMISSIONS);
-        }
-
+        $isSuperadmin = $user->isSuperadmin();
         $permitted = [];
-        foreach (self::FIELD_PERMISSIONS as $key => $credential) {
-            if ($user->hasCredential($credential)) {
-                $permitted[] = $key;
+
+        foreach (self::FIELD_PERMISSIONS as $key => $credentials) {
+            if (is_array($credentials)) {
+                // Array = OR logic, checked WITHOUT superadmin bypass.
+                // Credentials like superadmin_debug must be explicitly assigned,
+                // even for superadmins — they are not auto-granted.
+                foreach ($credentials as $cred) {
+                    if ($user->hasExplicitCredential($cred)) {
+                        $permitted[] = $key;
+                        break;
+                    }
+                }
+            } else {
+                // Single credential: superadmin bypass applies
+                if ($isSuperadmin || $user->hasCredential($credentials)) {
+                    $permitted[] = $key;
+                }
             }
         }
 
@@ -103,7 +215,7 @@ class ContractListResource extends JsonResource
     }
 
     /**
-     * Check if a field key is permitted for the current user.
+     * Check if a field key is permitted for the current user (global check).
      */
     protected static function can(string $fieldKey): bool
     {
@@ -113,6 +225,46 @@ class ContractListResource extends JsonResource
         }
 
         return isset(static::$permittedFields[$fieldKey]);
+    }
+
+    /**
+     * Per-row authorization check matching Symfony isAuthorized().
+     *
+     * Returns true if:
+     *  1. User has superadmin/admin/contract_owner credential → always authorized
+     *  2. User does NOT have contract_list_owner credential → no ownership restriction
+     *  3. User is the owner (sale1, sale2, telepro, assistant) of this contract
+     */
+    protected function isAuthorized(): bool
+    {
+        $user = request()->user();
+        if (!$user) return false;
+
+        // superadmin/admin/contract_owner → always authorized
+        if ($user->hasCredential([['superadmin', 'admin', 'contract_owner']])) {
+            return true;
+        }
+
+        // No ownership restriction if user doesn't have contract_list_owner
+        if (!$user->hasCredential('contract_list_owner')) {
+            return true;
+        }
+
+        // Per-row ownership check
+        $userId = $user->id;
+        return $this->assistant_id === $userId
+            || $this->telepro_id === $userId
+            || $this->sale_1_id === $userId
+            || $this->sale_2_id === $userId;
+    }
+
+    /**
+     * Per-row field check: authorized for this row OR has global permission.
+     * Matches Symfony pattern: $item->isAuthorized() || $user->hasCredential(...)
+     */
+    protected function canField(string $fieldKey): bool
+    {
+        return $this->isAuthorized() || static::can($fieldKey);
     }
 
     public function toArray($request): array
@@ -143,11 +295,11 @@ class ContractListResource extends JsonResource
             'installer_user_id' => $this->installer_user_id,
             'installer_user' => $this->formatUserRelation('installerUser'),
             // Surface home is always visible (no credential check in Symfony template)
-            'surface_home' => $this->getVariableValue('surface_home'),
+            'surface_home' => $this->getDomoprimeValue('surface_home'),
         ];
 
         // Permission-gated ID (Symfony: contract_view_list_id)
-        if (static::can('id')) {
+        if ($this->canField('id')) {
             $data['id'] = $this->id;
         } else {
             $data['id'] = $this->id; // ID always needed for row key, but formatted display is gated
@@ -160,33 +312,33 @@ class ContractListResource extends JsonResource
             'pre_meeting_at' => 'Y-m-d H:i:s',
         ];
         foreach ($gatedDates as $field => $format) {
-            if (static::can($field)) {
+            if ($this->canField($field)) {
                 $data[$field] = $this->$field?->format($format);
             }
         }
 
         // Permission-gated customer
-        if (static::can('customer') && $this->relationLoaded('customer') && $this->customer) {
+        if ($this->canField('customer') && $this->relationLoaded('customer') && $this->customer) {
             $data['customer'] = $this->formatCustomer();
         }
 
         // Permission-gated users
         foreach (['telepro' => 'telepro_id', 'sale1' => 'sale_1_id', 'sale2' => 'sale_2_id', 'assistant' => 'assistant_id'] as $permKey => $fk) {
-            if (static::can($permKey)) {
+            if ($this->canField($permKey)) {
                 $data[$fk] = $this->$fk;
                 $data[$permKey] = $this->formatUserRelation($permKey);
             }
         }
 
         // Permission-gated creator (Symfony: contract_list_created_by)
-        if (static::can('creator')) {
+        if ($this->canField('creator')) {
             $data['created_by_id'] = $this->created_by_id;
             $data['creator'] = $this->formatUserRelation('creator');
         }
 
         // Permission-gated named relations (team + partners)
         foreach (['team' => 'team_id', 'financial_partner' => 'financial_partner_id', 'partner_layer' => 'partner_layer_id', 'polluter' => 'polluter_id', 'company' => 'company_id'] as $permKey => $fk) {
-            if (static::can($permKey)) {
+            if ($this->canField($permKey)) {
                 $relation = lcfirst(str_replace('_', '', ucwords($permKey, '_')));
                 $data[$fk] = $this->$fk;
                 $data[$permKey] = $this->formatRelation($relation, fn ($r) => [
@@ -197,7 +349,7 @@ class ContractListResource extends JsonResource
         }
 
         // Permission-gated campaign (Symfony: contract_list_campaign)
-        if (static::can('campaign')) {
+        if ($this->canField('campaign')) {
             $data['campaign_id'] = $this->campaign_id;
             $data['campaign'] = $this->formatRelation('campaign', fn ($c) => [
                 'id' => $c->id,
@@ -206,17 +358,13 @@ class ContractListResource extends JsonResource
         }
 
         // Permission-gated contributors (Symfony: contract_list_attributions)
-        if (static::can('contributor')) {
-            $data['contributors'] = $this->when(
+        if ($this->canField('contributor')) {
+            $data['contributor_summary'] = $this->when(
                 $this->relationLoaded('contributors') && $this->contributors->isNotEmpty(),
-                fn () => $this->contributors->map(fn ($c) => [
-                    'id' => $c->id,
-                    'type' => $c->type,
-                    'user_id' => $c->user_id,
-                    'user' => $c->relationLoaded('user') && $c->user
-                        ? ['id' => $c->user->id, 'name' => mb_strtoupper(trim($c->user->lastname . ' ' . $c->user->firstname))]
-                        : null,
-                ])->toArray()
+                fn () => $this->contributors
+                    ->filter(fn ($c) => $c->relationLoaded('user') && $c->user)
+                    ->map(fn ($c) => mb_strtoupper(trim($c->user->lastname . ' ' . $c->user->firstname)))
+                    ->implode(', ')
             );
         }
 
@@ -229,7 +377,7 @@ class ContractListResource extends JsonResource
             'time_status'     => ['timeStatus', 'time_state_id'],
         ];
         foreach ($statuses as $permKey => [$relation, $fk]) {
-            if (static::can($permKey)) {
+            if ($this->canField($permKey)) {
                 $data[$fk] = $this->$fk;
                 $data[$permKey] = $this->formatStatusRelation($relation);
             }
@@ -238,30 +386,54 @@ class ContractListResource extends JsonResource
         // Permission-gated boolean flags
         $gatedFlags = ['is_confirmed', 'is_hold_quote', 'is_document', 'is_photo', 'is_quality', 'status'];
         foreach ($gatedFlags as $flag) {
-            if (static::can($flag)) {
+            if ($this->canField($flag)) {
                 $data[$flag] = $this->$flag;
             }
         }
-        if (static::can('is_hold')) {
+        if ($this->canField('is_hold')) {
             $data['is_hold'] = $this->is_hold;
             $data['is_hold_admin'] = $this->is_hold_admin;
         }
 
-        // Permission-gated domoprime surfaces (from variables JSON or related tables)
-        foreach (['surface_top', 'surface_wall', 'surface_floor', 'surface_parcel'] as $surfaceKey) {
-            if (static::can($surfaceKey)) {
-                $data[$surfaceKey] = $this->getVariableValue($surfaceKey);
+        // Permission-gated domoprime surfaces (from domoprimeIsoRequest relation)
+        $surfaceMap = [
+            'surface_top' => 'surface_top',
+            'surface_wall' => 'surface_wall',
+            'surface_floor' => 'surface_floor',
+            'surface_parcel' => 'parcel_surface',
+        ];
+        foreach ($surfaceMap as $permKey => $requestField) {
+            if ($this->canField($permKey)) {
+                $data[$permKey] = $this->getDomoprimeValue($requestField);
             }
         }
 
-        // Permission-gated pricing (domoprime)
-        if (static::can('pricing')) {
-            $data['pricing'] = $this->getVariableValue('pricing');
+        // Permission-gated pricing (domoprime — from request.pricing.name)
+        if ($this->canField('pricing')) {
+            $request = $this->getDomoprimeRequest();
+            $data['pricing'] = $request?->relationLoaded('pricing') && $request->pricing
+                ? $request->pricing->name
+                : null;
         }
 
         // Permission-gated energy class (domoprime)
-        if (static::can('class_energy')) {
-            $data['class_energy'] = $this->getVariableValue('class_energy');
+        if ($this->canField('class_energy')) {
+            $data['class_energy'] = $this->getDomoprimeValue('energy_class');
+        }
+
+        // Permission-gated Prime Rénov (tpl:1058–1089, via customer.primerenov)
+        if ($this->canField('prime_renov')) {
+            $primerenov = $this->relationLoaded('customer') && $this->customer
+                && $this->customer->relationLoaded('primerenov') && $this->customer->primerenov
+                ? $this->customer->primerenov
+                : null;
+
+            $data['prime_renov'] = $primerenov ? [
+                'reference' => $primerenov->reference,
+                'amount' => $primerenov->amount,
+                'state1' => $primerenov->state1,
+                'state2' => $primerenov->state2,
+            ] : null;
         }
 
         // Computed state flags for frontend toggle display
@@ -285,14 +457,24 @@ class ContractListResource extends JsonResource
     }
 
     /**
-     * Get a value from the variables JSON field.
-     * Used for domoprime plugin data (surfaces, pricing, class).
+     * Get the first domoprime ISO request for this contract (cached).
      */
-    protected function getVariableValue(string $key): mixed
+    protected function getDomoprimeRequest(): mixed
     {
-        $variables = $this->variables ? json_decode($this->variables, true) : [];
+        if (!$this->relationLoaded('domoprimeIsoRequest')) {
+            return null;
+        }
 
-        return $variables[$key] ?? null;
+        return $this->domoprimeIsoRequest->first();
+    }
+
+    /**
+     * Get a value from the domoprime ISO request.
+     * Surfaces, energy class, etc. are stored as direct columns on the request.
+     */
+    protected function getDomoprimeValue(string $field): mixed
+    {
+        return $this->getDomoprimeRequest()?->$field;
     }
 
     protected function formatUserRelation(string $relation): mixed
@@ -342,7 +524,7 @@ class ContractListResource extends JsonResource
             'email' => $this->customer->email,
         ];
 
-        if (static::can('customer_phone')) {
+        if ($this->canField('customer_phone')) {
             $customer['phone'] = $this->customer->phone;
             $customer['mobile'] = $this->customer->mobile;
         }
@@ -350,10 +532,10 @@ class ContractListResource extends JsonResource
         if ($this->customer->relationLoaded('addresses') && $this->customer->addresses->isNotEmpty()) {
             $addr = $this->customer->addresses->first();
             $address = ['id' => $addr->id, 'address1' => $addr->address1, 'address2' => $addr->address2, 'country' => $addr->country];
-            if (static::can('customer_postcode')) {
+            if ($this->canField('customer_postcode')) {
                 $address['postcode'] = $addr->postcode;
             }
-            if (static::can('customer_city')) {
+            if ($this->canField('customer_city')) {
                 $address['city'] = $addr->city;
             }
             $customer['address'] = $address;

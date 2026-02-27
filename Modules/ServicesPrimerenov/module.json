@@ -1,0 +1,11 @@
+{
+    "name": "ServicesPrimerenov",
+    "alias": "servicesprimerenov",
+    "description": "Prime Rénov integration - manages PrimeRénov customer accounts and requests",
+    "keywords": ["primerenov", "multi-tenant"],
+    "priority": 0,
+    "providers": [
+        "Modules\\ServicesPrimerenov\\Providers\\ServicesPrimeRenovServiceProvider"
+    ],
+    "files": []
+}
