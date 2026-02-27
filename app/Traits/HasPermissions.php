@@ -277,6 +277,15 @@ trait HasPermissions
     }
 
     /**
+     * Check a credential WITHOUT superadmin bypass.
+     * Used for elevated permissions like superadmin_debug that must be explicitly assigned.
+     */
+    public function hasExplicitCredential(string $credential): bool
+    {
+        return $this->checkSingleCredential($credential);
+    }
+
+    /**
      * Clear all cached permission/group data
      */
     public function clearPermissionCache(): void

@@ -710,14 +710,14 @@ class ContractRepository
                 ->get()
                 ->map(fn ($z) => ['id' => $z->id, 'name' => $z->name]),
             'energies' => $formatStatus(
-                \Modules\CustomersContracts\Entities\DomoprimeEnergy::with(['translations' => $withTranslations])->get()
+                \Modules\AppDomoprime\Entities\DomoprimeEnergy::with(['translations' => $withTranslations])->get()
             ),
-            'sectors' => \Modules\CustomersContracts\Entities\DomoprimeSector::select('id', 'name')
+            'sectors' => \Modules\AppDomoprime\Entities\DomoprimeSector::select('id', 'name')
                 ->orderBy('name')
                 ->get()
                 ->map(fn ($s) => ['id' => $s->id, 'name' => $s->name]),
             'classes' => $formatStatus(
-                \Modules\CustomersContracts\Entities\DomoprimeClass::with(['translations' => $withTranslations])->get()
+                \Modules\AppDomoprime\Entities\DomoprimeClass::with(['translations' => $withTranslations])->get()
             ),
             'quotation_signed' => [
                 ['id' => 'YES', 'name' => 'Oui'],
