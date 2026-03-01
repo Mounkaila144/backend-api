@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Modules\AppDomoprime\Http\Controllers\Admin\AppDomoprimeController;
 
 /*
 |--------------------------------------------------------------------------
@@ -10,6 +11,6 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('api/admin')->middleware(['tenant', 'auth:sanctum'])->group(function () {
     Route::prefix('appdomoprime')->name('admin.appdomoprime.')->group(function () {
-        // Routes will be added here as controllers are created
+        Route::get('/filter-options', [AppDomoprimeController::class, 'filterOptions'])->name('filterOptions');
     });
 });
