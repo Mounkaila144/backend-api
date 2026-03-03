@@ -534,6 +534,7 @@ class ContractRepository
             'partnerLayer:id,name',
             'polluter:id,name',
             'company:id,name',
+            'campaign:id,name',
             'tax:id,rate',
             'products',
             'history',

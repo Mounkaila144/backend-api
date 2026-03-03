@@ -11,10 +11,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $dept
  * @property int $region_id
  * @property string $sector
+ * @property int $sector_id
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  *
  * @property-read DomoprimeRegion $region
+ * @property-read DomoprimeSector $sectorModel
  */
 class DomoprimeZone extends Model
 {
@@ -25,20 +27,27 @@ class DomoprimeZone extends Model
     protected $fillable = [
         'code',
         'dept',
-        'region_id',
         'sector',
+        'region_id',
+        'sector_id',
     ];
 
     protected $casts = [
         'id' => 'integer',
         'code' => 'string',
         'dept' => 'string',
-        'region_id' => 'integer',
         'sector' => 'string',
+        'region_id' => 'integer',
+        'sector_id' => 'integer',
     ];
 
     public function region(): BelongsTo
     {
         return $this->belongsTo(DomoprimeRegion::class, 'region_id');
+    }
+
+    public function sectorModel(): BelongsTo
+    {
+        return $this->belongsTo(DomoprimeSector::class, 'sector_id');
     }
 }

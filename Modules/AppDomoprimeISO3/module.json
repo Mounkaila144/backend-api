@@ -1,0 +1,11 @@
+{
+    "name": "AppDomoprimeISO3",
+    "alias": "appdomoprimeiso3",
+    "description": "AppDomoprimeISO3 module - ISO3 multi-work quotations (ISO/BOILER/PACK/ITE/TYPE1/TYPE2) with CEE calculation engines",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\AppDomoprimeISO3\\Providers\\AppDomoprimeISO3ServiceProvider"
+    ],
+    "files": []
+}

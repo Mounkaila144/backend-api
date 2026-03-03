@@ -70,6 +70,12 @@ class ContractResource extends JsonResource
             'meeting_id' => $this->meeting_id,
             'financial_partner_id' => $this->financial_partner_id,
             'tax_id' => $this->tax_id,
+            'polluter_id' => $this->polluter_id,
+            'partner_layer_id' => $this->partner_layer_id,
+            'campaign_id' => $this->campaign_id,
+            'opc_status_id' => $this->opc_status_id,
+            'time_state_id' => $this->time_state_id,
+            'created_by_id' => $this->created_by_id,
 
             // Team members
             'team_id' => $this->team_id,
@@ -89,8 +95,13 @@ class ContractResource extends JsonResource
             'payment_at' => $this->payment_at?->format('Y-m-d'),
             'opc_at' => $this->opc_at?->format('Y-m-d H:i:s'),
             'opc_range_id' => $this->opc_range_id,
+            'sav_at' => $this->sav_at?->format('Y-m-d H:i:s'),
             'sav_at_range_id' => $this->sav_at_range_id,
             'apf_at' => $this->apf_at?->format('Y-m-d'),
+            'pre_meeting_at' => $this->pre_meeting_at?->format('Y-m-d H:i:s'),
+            'doc_at' => $this->doc_at,
+            'closed_at' => $this->closed_at?->format('Y-m-d H:i:s'),
+            'signed_at' => $this->signed_at?->format('Y-m-d'),
 
             // Status
             'state_id' => $this->state_id,
@@ -99,6 +110,8 @@ class ContractResource extends JsonResource
             'install_status' => $this->formatStatus('installStatus'),
             'admin_status_id' => $this->admin_status_id,
             'admin_status' => $this->formatStatus('adminStatus'),
+            'opc_status' => $this->formatStatus('opcStatus'),
+            'time_status' => $this->formatStatus('timeStatus'),
 
             // Financial
             'total_price_with_taxe' => (float) $this->total_price_with_taxe,
@@ -106,6 +119,33 @@ class ContractResource extends JsonResource
             'mensuality' => (float) $this->mensuality,
             'advance_payment' => (float) $this->advance_payment,
             'company_id' => $this->company_id,
+
+            // Relations: Partners & Campaign
+            'polluter' => $this->whenLoaded('polluter', fn () => $this->polluter ? [
+                'id' => $this->polluter->id,
+                'name' => $this->polluter->name,
+            ] : null),
+            'partner_layer' => $this->whenLoaded('partnerLayer', fn () => $this->partnerLayer ? [
+                'id' => $this->partnerLayer->id,
+                'name' => $this->partnerLayer->name,
+            ] : null),
+            'financial_partner' => $this->whenLoaded('financialPartner', fn () => $this->financialPartner ? [
+                'id' => $this->financialPartner->id,
+                'name' => $this->financialPartner->name,
+            ] : null),
+            'campaign' => $this->whenLoaded('campaign', fn () => $this->campaign ? [
+                'id' => $this->campaign->id,
+                'name' => $this->campaign->name,
+            ] : null),
+
+            // Relations: Users
+            'creator' => $this->formatUser('creator'),
+            'manager' => $this->formatUser('manager'),
+            'telepro' => $this->formatUser('telepro'),
+            'sale1' => $this->formatUser('sale1'),
+            'sale2' => $this->formatUser('sale2'),
+            'assistant' => $this->formatUser('assistant'),
+            'installer_user' => $this->formatUser('installerUser'),
 
             // Additional info
             'remarks' => $this->remarks,
@@ -116,6 +156,9 @@ class ContractResource extends JsonResource
             'is_hold_admin' => $this->is_hold_admin,
             'is_hold_quote' => $this->is_hold_quote,
             'is_billable' => $this->is_billable,
+            'is_document' => $this->is_document,
+            'is_photo' => $this->is_photo,
+            'is_quality' => $this->is_quality,
             'status_flag' => $this->getAttribute('status'), // ACTIVE or DELETE
 
             'products' => $this->whenLoaded('products', fn () => $this->products->map(fn ($p) => [
@@ -153,6 +196,15 @@ class ContractResource extends JsonResource
             'name' => $this->$relation->name,
             'color' => $this->$relation->color,
             'icon' => $this->$relation->icon,
+        ] : null);
+    }
+
+    protected function formatUser(string $relation): mixed
+    {
+        return $this->whenLoaded($relation, fn () => $this->$relation ? [
+            'id' => $this->$relation->id,
+            'firstname' => $this->$relation->firstname,
+            'lastname' => $this->$relation->lastname,
         ] : null);
     }
 }

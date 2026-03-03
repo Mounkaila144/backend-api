@@ -11,6 +11,9 @@ use Modules\CustomersContracts\Http\Resources\ContractListResource;
 use Modules\CustomersContracts\Http\Resources\ContractListCollection;
 use Modules\CustomersContracts\Http\Requests\StoreContractRequest;
 use Modules\CustomersContracts\Http\Requests\UpdateContractRequest;
+use Modules\CustomersContracts\Entities\ServicesImpotVerifRequest;
+use Modules\CustomersContracts\Entities\ServicesImpotVerifCustomer;
+use Modules\AppDomoprime\Entities\DomoprimeIsoCustomerRequest;
 use Modules\CustomersContracts\Repositories\ContractRepository;
 
 class ContractController extends Controller
@@ -65,6 +68,11 @@ class ContractController extends Controller
 
         DB::beginTransaction();
 
+        // Extract nested data before resolving customer
+        $isoData = $data['iso'] ?? null;
+        $verifData = $data['verif'] ?? [];
+        unset($data['iso'], $data['verif']);
+
         $data = $this->resolveCustomerData($data);
 
         if (empty($data['reference'])) {
@@ -74,6 +82,7 @@ class ContractController extends Controller
 
         $contract = $this->repository->create($data);
 
+        // Save products
         if (! empty($request->products)) {
             foreach ($request->products as $product) {
                 $contract->products()->create([
@@ -81,6 +90,31 @@ class ContractController extends Controller
                     'details' => $product['details'] ?? null,
                 ]);
             }
+        }
+
+        // Save ISO (Domoprime) data
+        if ($isoData && array_filter($isoData)) {
+            $isoData['contract_id'] = $contract->id;
+            $isoData['customer_id'] = $contract->customer_id;
+            DomoprimeIsoCustomerRequest::create($isoData);
+        }
+
+        // Save fiscal verification entries
+        foreach ($verifData as $entry) {
+            if (empty($entry['reference']) && empty($entry['number'])) {
+                continue;
+            }
+
+            $verifRequest = ServicesImpotVerifRequest::create([
+                'reference' => $entry['reference'] ?? '',
+                'number' => $entry['number'] ?? '',
+                'status' => 'ACTIVE',
+            ]);
+
+            ServicesImpotVerifCustomer::create([
+                'customer_id' => $contract->customer_id,
+                'request_id' => $verifRequest->id,
+            ]);
         }
 
         $this->repository->logHistory($contract, 'Contract created', $request->user());
@@ -199,21 +233,25 @@ class ContractController extends Controller
         $customerData = $data['customer'];
         unset($data['customer']);
 
-        $customer = $existingCustomerId
-            ? \Modules\Customer\Entities\Customer::updateOrCreate(
-                ['id' => $existingCustomerId],
-                [
-                    'lastname' => $customerData['lastname'],
-                    'firstname' => $customerData['firstname'],
-                    'phone' => $customerData['phone'],
-                    'union_id' => $customerData['union_id'] ?? 0,
-                    'status' => 'ACTIVE',
-                ]
-            )
-            : \Modules\Customer\Entities\Customer::firstOrCreate(
-                ['lastname' => $customerData['lastname'], 'firstname' => $customerData['firstname'], 'phone' => $customerData['phone']],
-                ['status' => 'ACTIVE', 'union_id' => $customerData['union_id'] ?? 0]
-            );
+        $customerFields = [
+            'lastname' => $customerData['lastname'],
+            'firstname' => $customerData['firstname'],
+            'phone' => $customerData['phone'],
+            'email' => $customerData['email'] ?? '',
+            'mobile' => $customerData['mobile'] ?? '',
+            'mobile2' => $customerData['mobile2'] ?? '',
+            'gender' => $customerData['gender'] ?? null,
+            'company' => $customerData['company'] ?? '',
+            'union_id' => $customerData['union_id'] ?? 0,
+            'status' => 'ACTIVE',
+        ];
+
+        $customer = \Modules\Customer\Entities\Customer::updateOrCreate(
+            $existingCustomerId
+                ? ['id' => $existingCustomerId]
+                : ['lastname' => $customerData['lastname'], 'firstname' => $customerData['firstname'], 'phone' => $customerData['phone']],
+            $customerFields
+        );
 
         if (isset($customerData['address'])) {
             $addr = $customerData['address'];

@@ -7,5 +7,6 @@
     "CustomersContracts": true,
     "Site": true,
     "Superadmin": true,
-    "AppDomoprime": true
+    "AppDomoprime": true,
+    "AppDomoprimeISO3": true
 }

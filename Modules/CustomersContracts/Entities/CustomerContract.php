@@ -112,6 +112,7 @@ class CustomerContract extends Model
         'closed_at',
         'signed_at',
         'pre_meeting_at',
+        'doc_at',
         'state_id',
         'install_state_id',
         'admin_status_id',

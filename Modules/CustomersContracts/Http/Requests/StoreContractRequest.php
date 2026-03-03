@@ -3,6 +3,8 @@
 namespace Modules\CustomersContracts\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
+use Modules\Customer\Entities\Customer;
 
 /**
  * Store Contract Request Validation
@@ -15,6 +17,47 @@ class StoreContractRequest extends FormRequest
     public function authorize(): bool
     {
         return true; // Adjust based on your authorization logic
+    }
+
+    /**
+     * After standard validation passes, check for duplicate customer.
+     */
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator) {
+            $customer = $this->input('customer');
+
+            if (! $customer) {
+                return;
+            }
+
+            $phone = $customer['phone'] ?? null;
+            $email = $customer['email'] ?? null;
+
+            if (! $phone && ! $email) {
+                return;
+            }
+
+            $query = Customer::query();
+
+            if ($phone && $email) {
+                // Both provided: block if a customer matches BOTH
+                $query->where('phone', $phone)->where('email', $email);
+            } elseif ($phone) {
+                $query->where('phone', $phone);
+            } else {
+                $query->where('email', $email);
+            }
+
+            $existing = $query->first();
+
+            if ($existing) {
+                $validator->errors()->add(
+                    'customer',
+                    "Ce client existe déjà (#{$existing->id} — {$existing->firstname} {$existing->lastname}, tél: {$existing->phone}, email: {$existing->email})"
+                );
+            }
+        });
     }
 
     /**
@@ -35,6 +78,12 @@ class StoreContractRequest extends FormRequest
             'manager_id' => 'nullable|integer',
             'assistant_id' => 'nullable|integer',
             'installer_user_id' => 'nullable|integer|exists:t_users,id',
+            'polluter_id' => 'nullable|integer',
+            'opc_status_id' => 'nullable|integer',
+            'time_state_id' => 'nullable|integer',
+            'campaign_id' => 'nullable|integer',
+            'mensuality' => 'nullable|numeric|min:0',
+            'advance_payment' => 'nullable|numeric|min:0',
 
             // Required date fields (only these are mandatory)
             'quoted_at' => 'required|date',
@@ -46,7 +95,12 @@ class StoreContractRequest extends FormRequest
             'sent_at' => 'nullable|date',
             'payment_at' => 'nullable|date',
             'opc_range_id' => 'nullable|integer',
+            'sav_at_range_id' => 'nullable|integer',
             'apf_at' => 'nullable|date',
+            'sav_at' => 'nullable|date',
+            'pre_meeting_at' => 'nullable|date',
+            'doc_at' => 'nullable|date',
+            'closed_at' => 'nullable|date',
             'state_id' => 'nullable|integer|exists:t_customers_contracts_status,id',
             'install_state_id' => 'nullable|integer|exists:t_customers_contracts_install_status,id',
             'admin_status_id' => 'nullable|integer|exists:t_customers_contracts_admin_status,id',
@@ -55,6 +109,7 @@ class StoreContractRequest extends FormRequest
             'remarks' => 'nullable|string',
             'variables' => 'nullable|json',
             'is_signed' => 'nullable|in:YES,NO',
+            'is_billable' => 'nullable|in:YES,NO',
             'status' => 'nullable|in:ACTIVE,DELETE',
             'company_id' => 'nullable|integer',
 
@@ -64,12 +119,53 @@ class StoreContractRequest extends FormRequest
             'customer.firstname' => 'required|string|max:255',
             'customer.phone' => 'required|string|max:20',
             'customer.union_id' => 'nullable|integer|exists:t_customers_union,id',
+            'customer.email' => 'nullable|string|email|max:255',
+            'customer.mobile' => 'nullable|string|max:128',
+            'customer.mobile2' => 'nullable|string|max:20',
+            'customer.gender' => 'nullable|in:Mr,Ms,Mrs',
+            'customer.company' => 'nullable|string|max:255',
 
             // Address information (nested structure) - only these fields are mandatory
             'customer.address' => 'required|array',
             'customer.address.address1' => 'required|string|max:255',
             'customer.address.postcode' => 'required|string|max:10',
             'customer.address.city' => 'required|string|max:255',
+
+            // ISO (Domoprime) data
+            'iso' => 'nullable|array',
+            'iso.energy_id' => 'nullable|integer',
+            'iso.pricing_id' => 'nullable|integer',
+            'iso.occupation_id' => 'nullable|integer',
+            'iso.layer_type_id' => 'nullable|integer',
+            'iso.previous_energy_id' => 'nullable|integer',
+            'iso.ana_prime' => 'nullable|numeric',
+            'iso.number_of_people' => 'nullable|numeric',
+            'iso.revenue' => 'nullable|numeric',
+            'iso.number_of_fiscal' => 'nullable|numeric',
+            'iso.number_of_parts' => 'nullable|numeric',
+            'iso.declarants' => 'nullable|string|max:255',
+            'iso.more_2_years' => 'nullable|in:YES,NO',
+            'iso.surface_home' => 'nullable|numeric',
+            'iso.surface_wall' => 'nullable|numeric',
+            'iso.surface_top' => 'nullable|numeric',
+            'iso.surface_floor' => 'nullable|numeric',
+            'iso.surface_ite' => 'nullable|numeric',
+            'iso.boiler_quantity' => 'nullable|numeric',
+            'iso.pack_quantity' => 'nullable|numeric',
+            'iso.parcel_reference' => 'nullable|string|max:64',
+            'iso.parcel_surface' => 'nullable|numeric',
+            'iso.energy_class' => 'nullable|string|max:1',
+            'iso.build_year' => 'nullable|string|max:4',
+            'iso.number_of_children' => 'nullable|numeric',
+            'iso.tax_credit_used' => 'nullable|numeric',
+            'iso.install_surface_top' => 'nullable|numeric',
+            'iso.install_surface_wall' => 'nullable|numeric',
+            'iso.install_surface_floor' => 'nullable|numeric',
+
+            // Fiscal verification entries
+            'verif' => 'nullable|array',
+            'verif.*.reference' => 'nullable|string|max:30',
+            'verif.*.number' => 'nullable|string|max:30',
 
             // Products
             'products' => 'nullable|array',
