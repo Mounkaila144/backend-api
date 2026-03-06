@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Modules\AppDomoprimeISO3\Http\Controllers\Admin\Iso3ResultsController;
+use Modules\AppDomoprimeISO3\Http\Controllers\Admin\Iso3DocumentController;
 
 /*
 |--------------------------------------------------------------------------
@@ -57,13 +58,13 @@ Route::prefix('api/admin')->middleware(['tenant', 'auth:sanctum'])->group(functi
         // Route::get('/quotations/{id}/results', [Iso3QuotationController::class, 'getResults'])->name('quotations.results');
 
         // Billings & Quotations lists for contract/meeting view
-        // Route::get('/contracts/{contractId}/billings', [Iso3QuotationController::class, 'listBillings'])->name('contracts.billings');
-        // Route::get('/contracts/{contractId}/quotations', [Iso3QuotationController::class, 'listQuotations'])->name('contracts.quotations');
+        Route::get('/contracts/{contractId}/billings', [Iso3DocumentController::class, 'listBillings'])->name('contracts.billings');
+        Route::get('/contracts/{contractId}/quotations', [Iso3DocumentController::class, 'listQuotations'])->name('contracts.quotations');
         // Route::get('/meetings/{meetingId}/quotations', [Iso3QuotationController::class, 'listMeetingQuotations'])->name('meetings.quotations');
 
         // PDF Export
-        // Route::get('/export/quotation/{id}/pdf', [Iso3QuotationController::class, 'exportPdf'])->name('export.pdf');
-        // Route::get('/export/quotation/{id}/all-pdf', [Iso3QuotationController::class, 'exportAllPdf'])->name('export.all-pdf');
-        // Route::get('/export/quotation/{id}/signed-pdf', [Iso3QuotationController::class, 'exportSignedPdf'])->name('export.signed-pdf');
+        Route::get('/export/quotation/{id}/pdf', [Iso3DocumentController::class, 'exportPdf'])->name('export.pdf');
+        Route::get('/export/quotation/{id}/all-pdf', [Iso3DocumentController::class, 'exportAllPdf'])->name('export.all-pdf');
+        Route::get('/export/quotation/{id}/signed-pdf', [Iso3DocumentController::class, 'exportSignedPdf'])->name('export.signed-pdf');
     });
 });

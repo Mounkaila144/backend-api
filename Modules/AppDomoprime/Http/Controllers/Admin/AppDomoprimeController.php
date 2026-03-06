@@ -10,6 +10,7 @@ use Modules\AppDomoprime\Entities\DomoprimeIsoOccupation;
 use Modules\AppDomoprime\Entities\DomoprimeIsoTypeLayer;
 use Modules\AppDomoprime\Entities\DomoprimeIsoCumacPrice;
 use Modules\AppDomoprime\Entities\DomoprimePreviousEnergy;
+use Modules\AppDomoprime\Entities\DomoprimeIsoCustomerRequest;
 
 class AppDomoprimeController extends Controller
 {
@@ -46,6 +47,27 @@ class AppDomoprimeController extends Controller
                     DomoprimePreviousEnergy::with(['translations' => $withTranslations])->get()
                 ),
             ],
+        ]);
+    }
+
+    /**
+     * Get ISO customer request by contract ID
+     */
+    public function getIsoRequestByContract(int $contractId): JsonResponse
+    {
+        $isoRequest = DomoprimeIsoCustomerRequest::where('contract_id', $contractId)->first();
+
+        if (!$isoRequest) {
+            return response()->json([
+                'success' => false,
+                'message' => 'ISO request not found for this contract',
+                'data' => null,
+            ], 404);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $isoRequest,
         ]);
     }
 }

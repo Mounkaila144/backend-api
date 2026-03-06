@@ -184,6 +184,22 @@ class ContractResource extends JsonResource
                 'user' => $c->relationLoaded('user') ? $c->user : null,
             ])),
 
+            // ISO/Domoprime data
+            'domoprime_iso_request' => $this->whenLoaded('domoprimeIsoRequest', fn () =>
+                $this->domoprimeIsoRequest->first()
+            ),
+
+            // Fiscal verification data
+            'verif' => $this->whenLoaded('customer', function () {
+                if ($this->customer && $this->customer->relationLoaded('verifCustomers')) {
+                    return $this->customer->verifCustomers->map(fn ($vc) => [
+                        'reference' => $vc->request->reference ?? '',
+                        'number' => $vc->request->number ?? '',
+                    ])->filter(fn ($v) => $v['reference'] || $v['number'])->values();
+                }
+                return [];
+            }),
+
             'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
             'updated_at' => $this->updated_at?->format('Y-m-d H:i:s'),
         ];

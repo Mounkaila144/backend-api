@@ -183,4 +183,12 @@ class Customer extends Model
     {
         return $this->company ?: $this->full_name;
     }
+
+    /**
+     * Get the fiscal verification entries for the customer.
+     */
+    public function verifCustomers(): HasMany
+    {
+        return $this->hasMany(\Modules\CustomersContracts\Entities\ServicesImpotVerifCustomer::class, 'customer_id', 'id');
+    }
 }

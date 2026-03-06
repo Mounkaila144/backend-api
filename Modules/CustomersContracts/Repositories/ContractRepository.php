@@ -517,6 +517,7 @@ class ContractRepository
     {
         return CustomerContract::with([
             'customer.addresses' => fn ($q) => $q->where('status', 'ACTIVE')->limit(1),
+            'customer.verifCustomers.request',
             'telepro:id,firstname,lastname',
             'sale1:id,firstname,lastname',
             'sale2:id,firstname,lastname',
@@ -539,6 +540,7 @@ class ContractRepository
             'products',
             'history',
             'contributors',
+            'domoprimeIsoRequest',
         ])->find($id);
     }
 
