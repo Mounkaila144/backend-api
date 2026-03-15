@@ -124,6 +124,8 @@ class ContractResource extends JsonResource
             'polluter' => $this->whenLoaded('polluter', fn () => $this->polluter ? [
                 'id' => $this->polluter->id,
                 'name' => $this->polluter->name,
+                'commercial' => $this->polluter->commercial,
+                'type' => $this->polluter->type,
             ] : null),
             'partner_layer' => $this->whenLoaded('partnerLayer', fn () => $this->partnerLayer ? [
                 'id' => $this->partnerLayer->id,

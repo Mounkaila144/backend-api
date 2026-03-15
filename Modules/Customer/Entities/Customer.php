@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Modules\ServicesPrimerenov\Entities\ServicePrimeRenovCustomer;
 
 class Customer extends Model
 {
@@ -128,7 +129,7 @@ class Customer extends Model
      */
     public function primerenov(): HasOne
     {
-        return $this->hasOne(\Modules\ServicesPrimerenov\Entities\ServicePrimeRenovCustomer::class, 'customer_id');
+        return $this->hasOne(ServicePrimeRenovCustomer::class, 'customer_id');
     }
 
     /**

@@ -337,7 +337,7 @@ class ContractListResource extends JsonResource
         }
 
         // Permission-gated named relations (team + partners)
-        foreach (['team' => 'team_id', 'financial_partner' => 'financial_partner_id', 'partner_layer' => 'partner_layer_id', 'polluter' => 'polluter_id', 'company' => 'company_id'] as $permKey => $fk) {
+        foreach (['team' => 'team_id', 'financial_partner' => 'financial_partner_id', 'partner_layer' => 'partner_layer_id', 'company' => 'company_id'] as $permKey => $fk) {
             if ($this->canField($permKey)) {
                 $relation = lcfirst(str_replace('_', '', ucwords($permKey, '_')));
                 $data[$fk] = $this->$fk;
@@ -346,6 +346,17 @@ class ContractListResource extends JsonResource
                     'name' => $permKey === 'company' ? $r->name : mb_strtoupper($r->name),
                 ]);
             }
+        }
+
+        // Polluter: includes commercial + type (needed for document section titles)
+        if ($this->canField('polluter')) {
+            $data['polluter_id'] = $this->polluter_id;
+            $data['polluter'] = $this->formatRelation('polluter', fn ($r) => [
+                'id' => $r->id,
+                'name' => mb_strtoupper($r->name),
+                'commercial' => $r->commercial,
+                'type' => $r->type,
+            ]);
         }
 
         // Permission-gated campaign (Symfony: contract_list_campaign)
@@ -419,6 +430,17 @@ class ContractListResource extends JsonResource
         // Permission-gated energy class (domoprime)
         if ($this->canField('class_energy')) {
             $data['class_energy'] = $this->getDomoprimeValue('energy_class');
+        }
+
+        // Domoprime calculation status (tpl:1744 — calculationForPager component inside customer column)
+        if ($this->relationLoaded('domoprimeCalculation') && $this->domoprimeCalculation->isNotEmpty()) {
+            $calc = $this->domoprimeCalculation->first();
+            $statusMap = ['ACCEPTED' => 'Accepté', 'REFUSED' => 'Refusé'];
+            $data['calculation'] = [
+                'status' => $calc->status,
+                'status_i18n' => $statusMap[$calc->status] ?? $calc->status,
+                'is_accepted' => $calc->status === 'ACCEPTED',
+            ];
         }
 
         // Permission-gated Prime Rénov (tpl:1058–1089, via customer.primerenov)

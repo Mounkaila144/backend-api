@@ -7,8 +7,10 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Routing\Controller;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Modules\AppDomoprime\Entities\DomoprimeBilling;
 use Modules\AppDomoprime\Entities\DomoprimeQuotation;
+use Modules\AppDomoprime\Services\PreMeetingDocumentService;
 use Modules\CustomersContracts\Entities\CustomerContract;
 
 class Iso3DocumentController extends Controller
@@ -75,16 +77,33 @@ class Iso3DocumentController extends Controller
 
     /**
      * Export a single quotation as PDF.
+     *
+     * If the contract has a polluter with a pre-meeting model configured,
+     * generates the PDF using PDFtk form filling + logo overlay (same as old Symfony system).
+     * Otherwise falls back to DomPDF HTML generation.
      */
-    public function exportPdf(int $id): Response
+    public function exportPdf(int $id): Response|BinaryFileResponse
     {
         $quotation = DomoprimeQuotation::with(['products', 'calculation', 'subventionType'])
             ->findOrFail($id);
 
         $contract = $quotation->contract_id
-            ? CustomerContract::with('customer')->find($quotation->contract_id)
+            ? CustomerContract::with(['customer', 'polluter', 'company', 'partnerLayer'])->find($quotation->contract_id)
             : null;
 
+        // Try pre-meeting PDF generation (reproduces old Symfony system)
+        if ($contract && $contract->polluter_id) {
+            $preMeetingService = app(PreMeetingDocumentService::class);
+            $pdfPath = $preMeetingService->generate($contract);
+            if ($pdfPath && file_exists($pdfPath)) {
+                $filename = 'devis_' . ($quotation->reference ?: $quotation->id) . '.pdf';
+                return response()->download($pdfPath, $filename, [
+                    'Content-Type' => 'application/pdf',
+                ])->deleteFileAfterSend(true);
+            }
+        }
+
+        // Fallback: DomPDF HTML generation
         $html = $this->buildQuotationHtml($quotation, $contract);
 
         $pdf = Pdf::loadHTML($html)->setPaper('a4');

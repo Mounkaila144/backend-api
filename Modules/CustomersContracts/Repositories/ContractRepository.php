@@ -56,7 +56,7 @@ class ContractRepository
         'time_status'       => 'timeStatus.translations',
         'financial_partner' => 'financialPartner:id,name',
         'partner_layer'     => 'partnerLayer:id,name',
-        'polluter'          => 'polluter:id,name',
+        'polluter'          => 'polluter:id,name,commercial,type',
         'company'           => 'company:id,name',
         'campaign'          => 'campaign',
         'contributor'       => 'contributors.user',
@@ -95,6 +95,7 @@ class ContractRepository
             'tax:id,rate',
             'products',
             'domoprimeIsoRequest.pricing:id,name',
+            'domoprimeCalculation' => fn ($q) => $q->where('isLast', 'YES')->select('id', 'contract_id', 'status')->limit(1),
         ];
 
         // If no permission filtering, load all relations (backward compat)
@@ -533,7 +534,7 @@ class ContractRepository
             'timeStatus.translations',
             'financialPartner:id,name',
             'partnerLayer:id,name',
-            'polluter:id,name',
+            'polluter:id,name,commercial,type',
             'company:id,name',
             'campaign:id,name',
             'tax:id,rate',

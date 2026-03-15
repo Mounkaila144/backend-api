@@ -27,6 +27,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $is_active
  * @property string $status
  * @property string $is_default
+ * @property string|null $commercial
  * @property string|null $type
  * @property \Carbon\Carbon $created_at
  * @property \Carbon\Carbon $updated_at
@@ -56,6 +57,7 @@ class PartnerPolluterCompany extends Model
         'is_active',
         'status',
         'is_default',
+        'commercial',
         'type',
     ];
 
