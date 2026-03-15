@@ -12,6 +12,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class DomoprimeIsoCustomerRequest extends Model
 {
+    protected $connection = 'tenant';
+
     protected $table = 't_domoprime_iso_customer_request';
 
     /**

@@ -8,5 +8,6 @@
     "Site": true,
     "Superadmin": true,
     "AppDomoprime": true,
-    "AppDomoprimeISO3": true
+    "AppDomoprimeISO3": true,
+    "CustomersMeetings": true
 }

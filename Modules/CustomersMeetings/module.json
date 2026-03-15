@@ -1,0 +1,11 @@
+{
+    "name": "CustomersMeetings",
+    "alias": "customersmeetings",
+    "description": "CustomersMeetings module with multi-tenant support",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\CustomersMeetings\\Providers\\CustomersMeetingsServiceProvider"
+    ],
+    "files": []
+}
