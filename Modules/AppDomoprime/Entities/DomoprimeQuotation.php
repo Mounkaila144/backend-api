@@ -2,6 +2,7 @@
 
 namespace Modules\AppDomoprime\Entities;
 
+use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -92,6 +93,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read \Illuminate\Database\Eloquent\Collection<int, DomoprimeQuotationProduct> $products
  * @property-read \Illuminate\Database\Eloquent\Collection<int, DomoprimeQuotationProductItem> $productItems
  * @property-read \Illuminate\Database\Eloquent\Collection<int, DomoprimeBilling> $billings
+ * @property-read User|null $creator
  */
 class DomoprimeQuotation extends Model
 {
@@ -255,6 +257,11 @@ class DomoprimeQuotation extends Model
     public function subventionType(): BelongsTo
     {
         return $this->belongsTo(DomoprimeSubventionType::class, 'subvention_type_id');
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'creator_id');
     }
 
     public function products(): HasMany

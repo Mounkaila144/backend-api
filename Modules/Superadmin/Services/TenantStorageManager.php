@@ -386,12 +386,13 @@ class TenantStorageManager implements TenantStorageManagerInterface
 
     /**
      * Retourne le chemin de base pour un tenant
-     * Utilise site_db_name comme nom de dossier (ex: "tenants/site_theme32")
+     * Utilise site_db_name comme nom de dossier (ex: "sites/site_theme32")
+     * Structure identique à Symfony pour permettre la migration directe des fichiers
      */
     public function getTenantPath(int $tenantId): string
     {
         $folderName = $this->resolveTenantFolder($tenantId);
-        return "tenants/{$folderName}";
+        return "sites/{$folderName}";
     }
 
     /**

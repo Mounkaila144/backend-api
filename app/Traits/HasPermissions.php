@@ -132,9 +132,18 @@ trait HasPermissions
      * Check a single credential (group OR permission) - O(1) lookup
      *
      * In Symfony 1, hasCredential() checks BOTH permissions AND groups.
+     * However, 'admin' and 'superadmin' are GROUP-ONLY credentials in Symfony
+     * (they come from sfGuard groups, not from permissions).
+     * We must NOT match them against the permissions table to avoid
+     * false positives when a permission named 'admin' exists.
      */
     protected function checkSingleCredential(string $credential): bool
     {
+        // 'admin' and 'superadmin' are group-only credentials (Symfony behavior)
+        if ($credential === 'admin' || $credential === 'superadmin') {
+            return $this->checkSingleGroup($credential);
+        }
+
         // O(1) group check
         if ($this->checkSingleGroup($credential)) {
             return true;

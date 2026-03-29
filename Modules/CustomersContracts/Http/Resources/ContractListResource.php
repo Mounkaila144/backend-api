@@ -459,16 +459,22 @@ class ContractListResource extends JsonResource
         }
 
         // Computed state flags for frontend toggle display
-        // Wrapped in try/catch: if settings table is missing or empty, default to false
+        // Use static cache to avoid repeated S3/storage lookups per item
         try {
-            $settings = app(ContractSettingsService::class);
-            $cancelStatusId = $settings->getStatusForCancel();
-            $blowingStatusId = $settings->getStatusForBlowing();
-            $placementStatusId = $settings->getStatusForPlacement();
+            static $statusCache = null;
 
-            $data['is_cancelled'] = $cancelStatusId && $this->state_id === $cancelStatusId;
-            $data['is_blowing'] = $blowingStatusId && $this->state_id === $blowingStatusId;
-            $data['is_placement'] = $placementStatusId && $this->state_id === $placementStatusId;
+            if ($statusCache === null) {
+                $settings = app(ContractSettingsService::class);
+                $statusCache = [
+                    'cancel' => $settings->getStatusForCancel(),
+                    'blowing' => $settings->getStatusForBlowing(),
+                    'placement' => $settings->getStatusForPlacement(),
+                ];
+            }
+
+            $data['is_cancelled'] = $statusCache['cancel'] && $this->state_id === $statusCache['cancel'];
+            $data['is_blowing'] = $statusCache['blowing'] && $this->state_id === $statusCache['blowing'];
+            $data['is_placement'] = $statusCache['placement'] && $this->state_id === $statusCache['placement'];
         } catch (\Throwable $e) {
             $data['is_cancelled'] = false;
             $data['is_blowing'] = false;

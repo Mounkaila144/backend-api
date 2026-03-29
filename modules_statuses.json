@@ -9,5 +9,17 @@
     "Superadmin": true,
     "AppDomoprime": true,
     "AppDomoprimeISO3": true,
-    "CustomersMeetings": true
+    "CustomersMeetings": true,
+    "CustomersContractsBilling": false,
+    "CustomersContractsComments": true,
+    "CustomersContractsDocumentsCheck": true,
+    "CustomersDocuments": true,
+    "CustomersCommunicationEmails": true,
+    "CustomersCommunicationSms": true,
+    "CustomersCommunicationWhatsApp": true,
+    "PartnersCommunicationWhatsApp": true,
+    "ProductsInstallerSchedule": true,
+    "ParticipantsManager": true,
+    "ServicesFidealis": true,
+    "CustomersMeetingsForms": true
 }

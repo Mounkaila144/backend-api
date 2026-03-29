@@ -5,6 +5,7 @@ namespace App\Providers;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Schema;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -21,6 +22,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Fix for MariaDB 10.1 / MySQL 5.x: max key length 767 bytes
+        // With utf8mb4 (4 bytes per char), 255 chars = 1020 bytes > 767
+        // Setting to 191 chars = 764 bytes < 767
+        Schema::defaultStringLength(191);
+
         // Configurer les rate limiters pour l'API
         $this->configureRateLimiting();
     }

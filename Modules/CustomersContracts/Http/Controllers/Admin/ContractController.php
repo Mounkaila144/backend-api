@@ -15,6 +15,7 @@ use Modules\CustomersContracts\Entities\ServicesImpotVerifRequest;
 use Modules\CustomersContracts\Entities\ServicesImpotVerifCustomer;
 use Modules\AppDomoprime\Entities\DomoprimeIsoCustomerRequest;
 use Modules\CustomersContracts\Repositories\ContractRepository;
+use App\Services\TabsManager;
 
 class ContractController extends Controller
 {
@@ -393,5 +394,25 @@ class ContractController extends Controller
         $data['customer_id'] = $customer->id;
 
         return $data;
+    }
+
+    /**
+     * Get tabs configuration for contract view
+     *
+     * Reproduces Symfony's TabsManager::getInstance('dashboard-site-customers-contract-view')
+     * Returns tabs filtered by the current user's credentials
+     */
+    public function tabs(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $namespace = $request->query('namespace', 'dashboard-site-customers-contract-view');
+
+        $tabsManager = TabsManager::getInstance($namespace);
+        $tabs = $tabsManager->toApiResponse($user);
+
+        return response()->json([
+            'success' => true,
+            'data' => $tabs,
+        ]);
     }
 }

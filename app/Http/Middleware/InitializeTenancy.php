@@ -18,14 +18,17 @@ class InitializeTenancy
         $timings = [];
         $start = microtime(true);
 
-        // Option 1: Identifier par header X-Tenant-ID (recommandé pour API)
+        // Option 1: Identifier par header X-Tenant-ID
         if ($request->hasHeader('X-Tenant-ID')) {
             $tenantId = $request->header('X-Tenant-ID');
-            $tenant = Tenant::where('site_id', $tenantId)
-                ->where('site_available', 'YES')
-                ->first();
-        } // Option 2: Identifier par domaine (Host header)
-        else {
+
+            $tenant = is_numeric($tenantId)
+                ? Tenant::where('site_id', $tenantId)->where('site_available', 'YES')->first()
+                : Tenant::where('site_host', $tenantId)->where('site_available', 'YES')->first();
+        }
+
+        // Option 2 (ou fallback): Identifier par domaine (Host header)
+        if (empty($tenant)) {
             $domain = $request->getHost();
             $tenant = Tenant::where('site_host', $domain)
                 ->where('site_available', 'YES')

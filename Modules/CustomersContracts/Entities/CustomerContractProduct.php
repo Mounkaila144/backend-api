@@ -40,12 +40,8 @@ class CustomerContractProduct extends Model
         return $this->belongsTo(CustomerContract::class, 'contract_id');
     }
 
-    /**
-     * Get the product details
-     * Note: You may need to create a Product model in the Products module
-     */
     public function product(): BelongsTo
     {
-        return $this->belongsTo('Modules\Products\Entities\Product', 'product_id');
+        return $this->belongsTo(\Modules\Product\Entities\Product::class, 'product_id');
     }
 }

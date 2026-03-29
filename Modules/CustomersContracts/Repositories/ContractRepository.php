@@ -95,7 +95,10 @@ class ContractRepository
             'tax:id,rate',
             'products',
             'domoprimeIsoRequest.pricing:id,name',
-            'domoprimeCalculation' => fn ($q) => $q->where('isLast', 'YES')->select('id', 'contract_id', 'status')->limit(1),
+            // Note: removed ->limit(1) because MariaDB 10.1 doesn't support ROW_NUMBER() OVER (PARTITION BY)
+            // which Laravel generates for limit() on eager-loaded HasMany relations.
+            // The ContractListResource already takes ->first() from the collection.
+            'domoprimeCalculation' => fn ($q) => $q->where('isLast', 'YES')->select('id', 'contract_id', 'status'),
         ];
 
         // If no permission filtering, load all relations (backward compat)
@@ -117,7 +120,7 @@ class ContractRepository
                 if (str_contains($relation, '.translations')) {
                     $eagerLoad[$relation] = fn ($q) => $q->where('lang', $lang);
                 } elseif ($relation === 'customer.addresses') {
-                    $eagerLoad[$relation] = fn ($q) => $q->where('status', 'ACTIVE')->limit(1);
+                    $eagerLoad[$relation] = fn ($q) => $q->where('status', 'ACTIVE');
                 } else {
                     $eagerLoad[] = $relation;
                 }
@@ -517,7 +520,7 @@ class ContractRepository
     public function findWithRelations(int $id): ?CustomerContract
     {
         return CustomerContract::with([
-            'customer.addresses' => fn ($q) => $q->where('status', 'ACTIVE')->limit(1),
+            'customer.addresses' => fn ($q) => $q->where('status', 'ACTIVE'),
             'customer.verifCustomers.request',
             'telepro:id,firstname,lastname',
             'sale1:id,firstname,lastname',

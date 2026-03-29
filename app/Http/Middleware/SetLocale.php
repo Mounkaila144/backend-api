@@ -68,10 +68,13 @@ class SetLocale
             }
         }
 
-        // Option 2 : Header Accept-Language
+        // Option 2 : Header Accept-Language (normalize to 2-letter code)
         $headerLocale = $request->header('Accept-Language');
-        if ($headerLocale && $this->isSupported($headerLocale)) {
-            return $headerLocale;
+        if ($headerLocale) {
+            $normalized = strtolower(substr($headerLocale, 0, 2));
+            if (in_array($normalized, $this->supportedLocales)) {
+                return $normalized;
+            }
         }
 
         // Option 3 : Préférence de l'utilisateur authentifié
