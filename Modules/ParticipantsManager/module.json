@@ -1,0 +1,11 @@
+{
+    "name": "ParticipantsManager",
+    "alias": "participantsmanager",
+    "description": "ParticipantsManager module",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\ParticipantsManager\\Providers\\ParticipantsManagerServiceProvider"
+    ],
+    "files": []
+}

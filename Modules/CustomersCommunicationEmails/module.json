@@ -1,0 +1,11 @@
+{
+    "name": "CustomersCommunicationEmails",
+    "alias": "customerscommunicationemails",
+    "description": "CustomersCommunicationEmails module",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\CustomersCommunicationEmails\\Providers\\CustomersCommunicationEmailsServiceProvider"
+    ],
+    "files": []
+}

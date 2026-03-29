@@ -1,0 +1,11 @@
+{
+    "name": "ProductsInstallerSchedule",
+    "alias": "productsinstallerschedule",
+    "description": "ProductsInstallerSchedule module",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\ProductsInstallerSchedule\\Providers\\ProductsInstallerScheduleServiceProvider"
+    ],
+    "files": []
+}

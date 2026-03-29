@@ -1,0 +1,11 @@
+{
+    "name": "CustomersCommunicationSms",
+    "alias": "customerscommunicationsms",
+    "description": "CustomersCommunicationSms module",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\CustomersCommunicationSms\\Providers\\CustomersCommunicationSmsServiceProvider"
+    ],
+    "files": []
+}

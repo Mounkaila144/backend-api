@@ -1,0 +1,11 @@
+{
+    "name": "PartnersCommunicationWhatsApp",
+    "alias": "partnerscommunicationwhatsapp",
+    "description": "PartnersCommunicationWhatsApp module",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\PartnersCommunicationWhatsApp\\Providers\\PartnersCommunicationWhatsAppServiceProvider"
+    ],
+    "files": []
+}

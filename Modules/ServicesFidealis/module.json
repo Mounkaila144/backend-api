@@ -1,0 +1,11 @@
+{
+    "name": "ServicesFidealis",
+    "alias": "servicesfidealis",
+    "description": "ServicesFidealis module",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\ServicesFidealis\\Providers\\ServicesFidealisServiceProvider"
+    ],
+    "files": []
+}

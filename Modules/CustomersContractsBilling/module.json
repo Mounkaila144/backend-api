@@ -1,0 +1,11 @@
+{
+    "name": "CustomersContractsBilling",
+    "alias": "customerscontractsbilling",
+    "description": "CustomersContractsBilling module",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\CustomersContractsBilling\\Providers\\CustomersContractsBillingServiceProvider"
+    ],
+    "files": []
+}

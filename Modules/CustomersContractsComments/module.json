@@ -1,0 +1,11 @@
+{
+    "name": "CustomersContractsComments",
+    "alias": "customerscontractscomments",
+    "description": "CustomersContractsComments module",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\CustomersContractsComments\\Providers\\CustomersContractsCommentsServiceProvider"
+    ],
+    "files": []
+}

@@ -1,0 +1,11 @@
+{
+    "name": "CustomersCommunicationWhatsApp",
+    "alias": "customerscommunicationwhatsapp",
+    "description": "CustomersCommunicationWhatsApp module",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\CustomersCommunicationWhatsApp\\Providers\\CustomersCommunicationWhatsAppServiceProvider"
+    ],
+    "files": []
+}

@@ -1,0 +1,11 @@
+{
+    "name": "CustomersContractsDocumentsCheck",
+    "alias": "customerscontractsdocumentscheck",
+    "description": "CustomersContractsDocumentsCheck module",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\CustomersContractsDocumentsCheck\\Providers\\CustomersContractsDocumentsCheckServiceProvider"
+    ],
+    "files": []
+}
