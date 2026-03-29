@@ -105,10 +105,11 @@ class CustomerController extends Controller
                 ],
             ]);
         } catch (\Exception $e) {
+            \Log::error('Error fetching customers', ['error' => $e->getMessage()]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Error fetching customers',
-                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -163,7 +164,6 @@ class CustomerController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Customer not found',
-                'error' => $e->getMessage(),
             ], 404);
         }
     }
@@ -206,11 +206,11 @@ class CustomerController extends Controller
             ], 201);
         } catch (\Exception $e) {
             DB::rollBack();
+            \Log::error('Error creating customer', ['error' => $e->getMessage()]);
 
             return response()->json([
                 'success' => false,
                 'message' => 'Error creating customer',
-                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -255,11 +255,11 @@ class CustomerController extends Controller
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
+            \Log::error('Error updating customer', ['id' => $id, 'error' => $e->getMessage()]);
 
             return response()->json([
                 'success' => false,
                 'message' => 'Error updating customer',
-                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -281,10 +281,11 @@ class CustomerController extends Controller
                 'message' => 'Customer deleted successfully',
             ]);
         } catch (\Exception $e) {
+            \Log::error('Error deleting customer', ['id' => $id, 'error' => $e->getMessage()]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Error deleting customer',
-                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -310,10 +311,11 @@ class CustomerController extends Controller
                 'data' => $stats,
             ]);
         } catch (\Exception $e) {
+            \Log::error('Error fetching customer statistics', ['error' => $e->getMessage()]);
+
             return response()->json([
                 'success' => false,
                 'message' => 'Error fetching statistics',
-                'error' => $e->getMessage(),
             ], 500);
         }
     }

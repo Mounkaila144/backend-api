@@ -133,9 +133,10 @@ class SiteController extends Controller
                 'data' => new SiteResource($site),
             ], 201);
         } catch (\Exception $e) {
+            \Log::error('Failed to create site', ['error' => $e->getMessage()]);
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to create site: ' . $e->getMessage(),
+                'message' => 'Failed to create site',
             ], 500);
         }
     }
@@ -198,9 +199,10 @@ class SiteController extends Controller
                 'data' => new SiteResource($site),
             ]);
         } catch (\Exception $e) {
+            \Log::error('Failed to update site', ['site_id' => $id, 'error' => $e->getMessage()]);
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to update site: ' . $e->getMessage(),
+                'message' => 'Failed to update site',
             ], 500);
         }
     }
@@ -222,9 +224,10 @@ class SiteController extends Controller
                 'message' => 'Site deleted successfully',
             ]);
         } catch (\Exception $e) {
+            \Log::error('Failed to delete site', ['site_id' => $id, 'error' => $e->getMessage()]);
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to delete site: ' . $e->getMessage(),
+                'message' => 'Failed to delete site',
             ], 500);
         }
     }
@@ -246,9 +249,10 @@ class SiteController extends Controller
             ]);
         }
 
+        \Log::error('Site connection test failed', ['site_id' => $id, 'error' => $result['error'] ?? 'Unknown error']);
         return response()->json([
             'success' => false,
-            'message' => 'Connection failed: ' . $result['error'],
+            'message' => 'Connection failed',
         ], 500);
     }
 
@@ -286,9 +290,10 @@ class SiteController extends Controller
                 'data' => new SiteResource($site),
             ]);
         } catch (\Exception $e) {
+            \Log::error('Failed to update database size', ['site_id' => $id, 'error' => $e->getMessage()]);
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to update database size: ' . $e->getMessage(),
+                'message' => 'Failed to update database size',
             ], 500);
         }
     }
@@ -357,9 +362,10 @@ class SiteController extends Controller
                 'message' => 'Sites availability updated successfully',
             ]);
         } catch (\Exception $e) {
+            \Log::error('Failed to update site availability', ['error' => $e->getMessage()]);
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to update availability: ' . $e->getMessage(),
+                'message' => 'Failed to update availability',
             ], 500);
         }
     }

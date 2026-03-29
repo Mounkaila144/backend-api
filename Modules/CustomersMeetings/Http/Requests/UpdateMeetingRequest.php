@@ -8,7 +8,9 @@ class UpdateMeetingRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        $user = $this->user();
+
+        return $user && ($user->isSuperadmin() || $user->hasCredential('meeting_modify'));
     }
 
     public function rules(): array
@@ -16,19 +18,19 @@ class UpdateMeetingRequest extends FormRequest
         return [
             'customer_id' => 'nullable|integer|exists:t_customers,id',
             'registration' => 'nullable|string|max:255',
-            'telepro_id' => 'nullable|integer',
-            'sales_id' => 'nullable|integer',
-            'sale2_id' => 'nullable|integer',
-            'assistant_id' => 'nullable|integer',
+            'telepro_id' => 'nullable|integer|exists:t_users,id',
+            'sales_id' => 'nullable|integer|exists:t_users,id',
+            'sale2_id' => 'nullable|integer|exists:t_users,id',
+            'assistant_id' => 'nullable|integer|exists:t_users,id',
             'company_id' => 'nullable|integer',
-            'polluter_id' => 'nullable|integer',
-            'partner_layer_id' => 'nullable|integer',
-            'callcenter_id' => 'nullable|integer',
-            'campaign_id' => 'nullable|integer',
-            'type_id' => 'nullable|integer',
-            'confirmator_id' => 'nullable|integer',
-            'status_call_id' => 'nullable|integer',
-            'status_lead_id' => 'nullable|integer',
+            'polluter_id' => 'nullable|integer|exists:t_partner_polluter_company,id',
+            'partner_layer_id' => 'nullable|integer|exists:t_partner_layer_company,id',
+            'callcenter_id' => 'nullable|integer|exists:t_callcenter,id',
+            'campaign_id' => 'nullable|integer|exists:t_campaign,id',
+            'type_id' => 'nullable|integer|exists:t_customers_meeting_type,id',
+            'confirmator_id' => 'nullable|integer|exists:t_users,id',
+            'status_call_id' => 'nullable|integer|exists:t_customers_meeting_status_call,id',
+            'status_lead_id' => 'nullable|integer|exists:t_customers_meeting_lead_status,id',
 
             // Date fields
             'in_at' => 'nullable|date',

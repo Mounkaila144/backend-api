@@ -11,7 +11,9 @@ class UpdateCustomerRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return true;
+        $user = $this->user();
+
+        return $user && ($user->isSuperadmin() || $user->hasCredential('customer_modify'));
     }
 
     /**

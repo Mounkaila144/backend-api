@@ -11,6 +11,11 @@ use Modules\ServicesPrimerenov\Entities\ServicePrimeRenovCustomer;
 class Customer extends Model
 {
     /**
+     * The database connection used by the model.
+     */
+    protected $connection = 'tenant';
+
+    /**
      * The table associated with the model.
      */
     protected $table = 't_customers';

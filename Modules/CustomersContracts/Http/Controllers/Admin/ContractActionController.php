@@ -304,15 +304,12 @@ class ContractActionController extends Controller
             return response()->json(['success' => false, 'message' => 'Message is required'], 422);
         }
 
-        // TODO: integrate with SMS provider service
-        $this->repository->logHistory($contract, 'SMS sent to ' . $mobile, $request->user());
-
         return response()->json([
-            'success' => true,
+            'success' => false,
             'action' => 'SendSms',
             'id' => $contract->id,
-            'message' => 'SMS sent successfully',
-        ]);
+            'message' => 'SMS service is not yet configured',
+        ], 501);
     }
 
     public function sendEmail(int $id, Request $request): JsonResponse
@@ -333,15 +330,12 @@ class ContractActionController extends Controller
             return response()->json(['success' => false, 'message' => 'Subject and body are required'], 422);
         }
 
-        // TODO: integrate with email service
-        $this->repository->logHistory($contract, 'Email sent to ' . $email, $request->user());
-
         return response()->json([
-            'success' => true,
+            'success' => false,
             'action' => 'SendEmail',
             'id' => $contract->id,
-            'message' => 'Email sent successfully',
-        ]);
+            'message' => 'Email service is not yet configured',
+        ], 501);
     }
 
     // ─── Comments ────────────────────────────────────────────

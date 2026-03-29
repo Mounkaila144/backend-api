@@ -64,7 +64,7 @@ class SiteResource extends JsonResource
             ],
             'size' => $this->site_size,
             'price' => $this->price,
-            'last_connection' => $this->last_connection?->toIso8601String(),
+            'last_connection' => $this->last_connection?->format('Y-m-d H:i:s'),
         ];
     }
 }

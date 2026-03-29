@@ -30,11 +30,6 @@ Route::prefix('api/admin')->middleware(['tenant', 'auth:sanctum'])->group(functi
             ->middleware('credential:admin,superadmin,settings_user_list')
             ->name('creation-options');
 
-        // DEBUG: Performance analysis endpoint
-        Route::get('/debug-performance', [UserController::class, 'debugPerformance'])
-            ->middleware('credential:admin,superadmin')
-            ->name('debug-performance');
-
         // =====================================================================
         // Search routes (Meilisearch)
         // =====================================================================

@@ -130,10 +130,10 @@ class MenuController extends Controller
                 'data' => $menu,
             ], 201);
         } catch (\Exception $e) {
+            \Log::error('Failed to create menu', ['error' => $e->getMessage()]);
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to create menu',
-                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -175,10 +175,10 @@ class MenuController extends Controller
                 'data' => $menu,
             ]);
         } catch (\Exception $e) {
+            \Log::error('Failed to update menu', ['error' => $e->getMessage()]);
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to update menu',
-                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -219,10 +219,10 @@ class MenuController extends Controller
                 'data' => $menu,
             ]);
         } catch (\Exception $e) {
+            \Log::error('Failed to move menu', ['error' => $e->getMessage()]);
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to move menu',
-                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -242,10 +242,10 @@ class MenuController extends Controller
                 'message' => 'Menu deleted successfully',
             ]);
         } catch (\Exception $e) {
+            \Log::error('Failed to delete menu', ['error' => $e->getMessage()]);
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to delete menu',
-                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -265,10 +265,10 @@ class MenuController extends Controller
                 'message' => 'Menu permanently deleted',
             ]);
         } catch (\Exception $e) {
+            \Log::error('Failed to hard delete menu', ['error' => $e->getMessage()]);
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to delete menu',
-                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -288,10 +288,10 @@ class MenuController extends Controller
                 'message' => 'Menu tree rebuilt successfully',
             ]);
         } catch (\Exception $e) {
+            \Log::error('Failed to rebuild menu tree', ['error' => $e->getMessage()]);
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to rebuild menu tree',
-                'error' => $e->getMessage(),
             ], 500);
         }
     }

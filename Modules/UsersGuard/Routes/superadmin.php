@@ -11,14 +11,14 @@ use Modules\UsersGuard\Http\Controllers\Superadmin\AuthController;
 */
 
 // Routes d'authentification (pas de middleware auth)
-Route::prefix('superadmin')->group(function () {
+Route::prefix('api/superadmin')->group(function () {
     Route::prefix('auth')->group(function () {
         Route::post('login', [AuthController::class, 'login']);
     });
 });
 
 // Routes protégées
-Route::prefix('superadmin')->middleware(['auth:sanctum'])->group(function () {
+Route::prefix('api/superadmin')->middleware(['auth:sanctum'])->group(function () {
     // Auth routes (protégées)
     Route::prefix('auth')->group(function () {
         Route::get('me', [AuthController::class, 'me']);

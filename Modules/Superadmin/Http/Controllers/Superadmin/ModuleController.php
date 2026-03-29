@@ -156,9 +156,9 @@ class ModuleController extends Controller
             ]);
 
         } catch (\Exception $e) {
+            \Log::error('Failed to generate dependency graph', ['module' => $module, 'error' => $e->getMessage()]);
             return response()->json([
                 'message' => 'Failed to generate dependency graph',
-                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -230,11 +230,12 @@ class ModuleController extends Controller
             ]);
 
         } catch (\Modules\Superadmin\Exceptions\ModuleDependencyException $e) {
+            \Log::error('Module dependency resolution failed', ['modules' => $modules, 'error' => $e->getMessage()]);
             return response()->json([
                 'data' => [
                     'canInstall' => false,
                     'requiredModules' => [],
-                    'missingDependencies' => [$e->getMessage()],
+                    'missingDependencies' => ['One or more module dependencies could not be resolved'],
                     'installOrder' => [],
                     'totalModules' => 0,
                 ],
@@ -282,11 +283,11 @@ class ModuleController extends Controller
                 default => 500,
             };
 
+            \Log::error('Module activation failed', ['module' => $module, 'tenant_id' => $id, 'error' => $e->getMessage(), 'context' => $e->context()]);
             return response()->json([
                 'message' => 'Module activation failed',
                 'error' => [
                     'code' => 'ACTIVATION_FAILED',
-                    'detail' => $e->getMessage(),
                     'context' => $e->context(),
                 ],
             ], $status);
@@ -326,11 +327,11 @@ class ModuleController extends Controller
             ], 200);
 
         } catch (\Exception $e) {
+            \Log::error('Batch activation failed', ['tenant_id' => $id, 'error' => $e->getMessage()]);
             return response()->json([
                 'message' => 'Batch activation failed',
                 'error' => [
                     'code' => 'BATCH_ACTIVATION_FAILED',
-                    'detail' => $e->getMessage(),
                 ],
             ], 500);
         }
@@ -351,8 +352,9 @@ class ModuleController extends Controller
                 'data' => $impact->toArray(),
             ]);
         } catch (\InvalidArgumentException $e) {
+            \Log::error('Deactivation impact analysis failed', ['module' => $module, 'tenant_id' => $id, 'error' => $e->getMessage()]);
             return response()->json([
-                'message' => $e->getMessage(),
+                'message' => 'Module not found or not active for this tenant',
             ], 404);
         }
     }
@@ -390,11 +392,11 @@ class ModuleController extends Controller
                 default => 500,
             };
 
+            \Log::error('Module deactivation failed', ['module' => $module, 'tenant_id' => $id, 'error' => $e->getMessage(), 'context' => $e->context()]);
             return response()->json([
                 'message' => 'Module deactivation failed',
                 'error' => [
                     'code' => 'DEACTIVATION_FAILED',
-                    'detail' => $e->getMessage(),
                     'context' => $e->context(),
                 ],
             ], $status);
@@ -454,9 +456,9 @@ class ModuleController extends Controller
                 ],
             ]);
         } catch (\Exception $e) {
+            \Log::error('Failed to check upgrades', ['module' => $module, 'tenant_id' => $id, 'error' => $e->getMessage()]);
             return response()->json([
                 'message' => 'Failed to check upgrades',
-                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -491,19 +493,19 @@ class ModuleController extends Controller
             ], $statusCode);
 
         } catch (\RuntimeException $e) {
+            \Log::error('Module upgrade failed', ['module' => $module, 'tenant_id' => $id, 'error' => $e->getMessage()]);
             return response()->json([
                 'message' => 'Module upgrade failed',
                 'error' => [
                     'code' => 'UPGRADE_FAILED',
-                    'detail' => $e->getMessage(),
                 ],
             ], 422);
         } catch (\Exception $e) {
+            \Log::error('Module upgrade error', ['module' => $module, 'tenant_id' => $id, 'error' => $e->getMessage()]);
             return response()->json([
                 'message' => 'Module upgrade failed',
                 'error' => [
                     'code' => 'UPGRADE_ERROR',
-                    'detail' => $e->getMessage(),
                 ],
             ], 500);
         }
@@ -548,9 +550,9 @@ class ModuleController extends Controller
             ]);
 
         } catch (\Exception $e) {
+            \Log::error('Failed to get module versions', ['module' => $module, 'error' => $e->getMessage()]);
             return response()->json([
                 'message' => 'Failed to get module versions',
-                'error' => $e->getMessage(),
             ], 500);
         }
     }

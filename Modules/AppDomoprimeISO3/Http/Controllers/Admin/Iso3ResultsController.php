@@ -220,6 +220,7 @@ class Iso3ResultsController extends Controller
                 ],
             ]);
         } catch (\Exception $e) {
+            \Log::error('ISO3 calculation failed for contract', ['contract_id' => $contractId, 'error' => $e->getMessage()]);
             $this->saveCalculationWithError($contract, $e->getMessage(), $user);
 
             return $this->returnCalculationError(
@@ -676,12 +677,13 @@ class Iso3ResultsController extends Controller
             ]);
 
         } catch (\Exception $e) {
+            \Log::error('ISO3 ANAH calculation failed for contract', ['contract_id' => $contractId, 'error' => $e->getMessage()]);
             return response()->json([
                 'success' => true,
                 'data' => [
                     'has_polluter' => true,
                     'anah' => null,
-                    'errors' => [$e->getMessage()],
+                    'errors' => ['Calculation failed due to an internal error'],
                 ],
             ]);
         }
@@ -810,7 +812,8 @@ class Iso3ResultsController extends Controller
                     ];
                 }
             } catch (\Exception $e) {
-                $errors[] = $e->getMessage();
+                \Log::error('ISO3 ANAH calculation failed for meeting', ['meeting_id' => $meetingId, 'error' => $e->getMessage()]);
+                $errors[] = 'Calculation failed due to an internal error';
             }
         }
 

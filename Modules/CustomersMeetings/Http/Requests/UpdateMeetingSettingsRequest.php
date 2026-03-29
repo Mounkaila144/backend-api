@@ -8,7 +8,9 @@ class UpdateMeetingSettingsRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        $user = $this->user();
+
+        return $user && ($user->isSuperadmin() || $user->hasCredential([['admin', 'meeting_settings']]));
     }
 
     public function rules(): array

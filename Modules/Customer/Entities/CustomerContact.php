@@ -8,6 +8,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class CustomerContact extends Model
 {
     /**
+     * The database connection used by the model.
+     */
+    protected $connection = 'tenant';
+
+    /**
      * The table associated with the model.
      */
     protected $table = 't_customers_contact';

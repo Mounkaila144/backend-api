@@ -37,16 +37,16 @@ class UserResource extends JsonResource
             'is_active' => $this->is_active,
             'is_guess' => $this->is_guess,
             'is_locked' => $this->is_locked,
-            'locked_at' => $this->locked_at?->toIso8601String(),
+            'locked_at' => $this->locked_at?->format('Y-m-d H:i:s'),
             'is_secure_by_code' => $this->is_secure_by_code,
             'status' => $this->status,
             'number_of_try' => $this->number_of_try,
 
             // Date fields
-            'last_password_gen' => $this->last_password_gen?->toIso8601String(),
-            'lastlogin' => $this->lastlogin?->toIso8601String(),
-            'created_at' => $this->created_at?->toIso8601String(),
-            'updated_at' => $this->updated_at?->toIso8601String(),
+            'last_password_gen' => $this->last_password_gen?->format('Y-m-d H:i:s'),
+            'lastlogin' => $this->lastlogin?->format('Y-m-d H:i:s'),
+            'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
+            'updated_at' => $this->updated_at?->format('Y-m-d H:i:s'),
 
             // Aggregated lists (from SQL queries for performance)
             'groups_list' => $this->groups_list ?? null,

@@ -9,6 +9,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class CustomerAddress extends Model
 {
     /**
+     * The database connection used by the model.
+     */
+    protected $connection = 'tenant';
+
+    /**
      * The table associated with the model.
      */
     protected $table = 't_customers_address';

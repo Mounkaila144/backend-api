@@ -22,7 +22,7 @@ class AuditLogResource extends JsonResource
             'error' => $this->properties['error'] ?? null,
             'completedSteps' => $this->properties['completed_steps'] ?? [],
             'metadata' => $this->properties['metadata'] ?? [],
-            'createdAt' => $this->created_at?->toIso8601String(),
+            'createdAt' => $this->created_at?->format('Y-m-d H:i:s'),
         ];
     }
 }

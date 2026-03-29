@@ -227,7 +227,8 @@ class DocumentController extends Controller
 
             return response()->json(['success' => true, 'message' => 'Paramètres enregistrés']);
         } catch (\Exception $e) {
-            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+            \Log::error('Failed to save document settings', ['error' => $e->getMessage()]);
+            return response()->json(['success' => false, 'message' => 'Failed to save settings'], 500);
         }
     }
 

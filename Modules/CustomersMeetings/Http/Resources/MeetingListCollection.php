@@ -14,4 +14,18 @@ class MeetingListCollection extends ResourceCollection
             'meetings' => $this->collection,
         ];
     }
+
+    public function with($request): array
+    {
+        return [
+            'meta' => [
+                'current_page' => $this->currentPage(),
+                'last_page' => $this->lastPage(),
+                'per_page' => $this->perPage(),
+                'total' => $this->total(),
+                'from' => $this->firstItem(),
+                'to' => $this->lastItem(),
+            ],
+        ];
+    }
 }

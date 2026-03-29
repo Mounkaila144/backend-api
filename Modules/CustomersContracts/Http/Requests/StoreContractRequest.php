@@ -16,7 +16,9 @@ class StoreContractRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return true; // Adjust based on your authorization logic
+        $user = $this->user();
+
+        return $user && ($user->isSuperadmin() || $user->hasCredential('contract_modify'));
     }
 
     /**
@@ -54,7 +56,7 @@ class StoreContractRequest extends FormRequest
             if ($existing) {
                 $validator->errors()->add(
                     'customer',
-                    "Ce client existe déjà (#{$existing->id} — {$existing->firstname} {$existing->lastname}, tél: {$existing->phone}, email: {$existing->email})"
+                    "Un client avec ces coordonnées existe déjà (réf: #{$existing->id})"
                 );
             }
         });
@@ -69,19 +71,19 @@ class StoreContractRequest extends FormRequest
             'reference' => 'nullable|string|max:255|unique:t_customers_contract,reference',
             'customer_id' => 'nullable|integer|exists:t_customers,id',
             'meeting_id' => 'nullable|integer|exists:t_customers_meeting,id',
-            'financial_partner_id' => 'nullable|integer',
-            'tax_id' => 'nullable|integer',
-            'team_id' => 'nullable|integer',
-            'telepro_id' => 'nullable|integer',
-            'sale_1_id' => 'nullable|integer',
-            'sale_2_id' => 'nullable|integer',
-            'manager_id' => 'nullable|integer',
-            'assistant_id' => 'nullable|integer',
+            'financial_partner_id' => 'nullable|integer|exists:t_partners_company,id',
+            'tax_id' => 'nullable|integer|exists:t_products_taxes,id',
+            'team_id' => 'nullable|integer|exists:t_users_team,id',
+            'telepro_id' => 'nullable|integer|exists:t_users,id',
+            'sale_1_id' => 'nullable|integer|exists:t_users,id',
+            'sale_2_id' => 'nullable|integer|exists:t_users,id',
+            'manager_id' => 'nullable|integer|exists:t_users,id',
+            'assistant_id' => 'nullable|integer|exists:t_users,id',
             'installer_user_id' => 'nullable|integer|exists:t_users,id',
-            'polluter_id' => 'nullable|integer',
-            'opc_status_id' => 'nullable|integer',
-            'time_state_id' => 'nullable|integer',
-            'campaign_id' => 'nullable|integer',
+            'polluter_id' => 'nullable|integer|exists:t_partner_polluter_company,id',
+            'opc_status_id' => 'nullable|integer|exists:t_customers_contracts_opc_status,id',
+            'time_state_id' => 'nullable|integer|exists:t_customers_contracts_time_status,id',
+            'campaign_id' => 'nullable|integer|exists:t_campaign,id',
             'mensuality' => 'nullable|numeric|min:0',
             'advance_payment' => 'nullable|numeric|min:0',
 

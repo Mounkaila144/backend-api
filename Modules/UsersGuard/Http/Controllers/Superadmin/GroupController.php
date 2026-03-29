@@ -59,10 +59,14 @@ class GroupController extends Controller
                 ];
 
             } catch (\Exception $e) {
+                \Log::error('Failed to fetch groups for site', [
+                    'site_id' => $site->site_id,
+                    'error' => $e->getMessage(),
+                ]);
                 $allGroups[] = [
                     'site_id' => $site->site_id,
                     'site_host' => $site->site_host,
-                    'error' => $e->getMessage(),
+                    'error' => 'Failed to connect to tenant database',
                 ];
             }
         }

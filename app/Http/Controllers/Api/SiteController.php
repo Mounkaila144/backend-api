@@ -117,10 +117,11 @@ class SiteController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
+            \Log::error('Failed to create site', ['error' => $e->getMessage()]);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to create site: ' . $e->getMessage(),
+                'message' => 'Failed to create site. Please check the provided configuration.',
             ], 500);
         }
     }
@@ -153,19 +154,19 @@ class SiteController extends Controller
      * Supprimer un site
      * DELETE /api/superadmin/sites/{id}
      */
-    public function destroy($id): JsonResponse
+    public function destroy(Request $request, $id): JsonResponse
     {
         $site = Tenant::findOrFail($id);
 
-        // Optionnel: Supprimer aussi la base de données
-        // ATTENTION: Cette opération est irréversible!
-        if (request()->get('delete_database') === true) {
+        if ($request->boolean('delete_database')) {
             try {
-                DB::statement("DROP DATABASE IF EXISTS `{$site->site_db_name}`");
+                $dbName = preg_replace('/[^a-zA-Z0-9_\-.]/', '', $site->site_db_name);
+                DB::statement("DROP DATABASE IF EXISTS `{$dbName}`");
             } catch (\Exception $e) {
+                \Log::error('Failed to delete tenant database', ['site_id' => $id, 'error' => $e->getMessage()]);
                 return response()->json([
                     'success' => false,
-                    'message' => 'Failed to delete database: ' . $e->getMessage(),
+                    'message' => 'Failed to delete database',
                 ], 500);
             }
         }
@@ -218,9 +219,11 @@ class SiteController extends Controller
             ]);
 
         } catch (\Exception $e) {
+            \Log::warning('Tenant connection test failed', ['site_id' => $id, 'error' => $e->getMessage()]);
+
             return response()->json([
                 'success' => false,
-                'message' => 'Connection failed: ' . $e->getMessage(),
+                'message' => 'Connection failed. Please verify database credentials and host accessibility.',
             ], 500);
         }
     }
@@ -230,23 +233,22 @@ class SiteController extends Controller
      */
     protected function createTenantDatabase(array $data): void
     {
-        $dbName = $data['site_db_name'];
+        $dbName = $this->sanitizeIdentifier($data['site_db_name']);
 
-        // Créer la base de données
         DB::connection('mysql')->statement(
             "CREATE DATABASE IF NOT EXISTS `{$dbName}`
             CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
         );
 
-        // Créer l'utilisateur MySQL (si différent de root)
         if ($data['site_db_login'] !== 'root') {
-            $user = $data['site_db_login'];
-            $password = $data['site_db_password'];
-            $host = $data['site_db_host'];
+            $user = $this->sanitizeIdentifier($data['site_db_login']);
+            $host = $this->sanitizeIdentifier($data['site_db_host']);
+            $pdo = DB::connection('mysql')->getPdo();
+            $escapedPassword = $pdo->quote($data['site_db_password']);
 
             DB::connection('mysql')->statement(
                 "CREATE USER IF NOT EXISTS '{$user}'@'{$host}'
-                IDENTIFIED BY '{$password}'"
+                IDENTIFIED BY {$escapedPassword}"
             );
 
             DB::connection('mysql')->statement(
@@ -256,6 +258,14 @@ class SiteController extends Controller
 
             DB::connection('mysql')->statement("FLUSH PRIVILEGES");
         }
+    }
+
+    /**
+     * Sanitize a MySQL identifier to prevent injection.
+     */
+    protected function sanitizeIdentifier(string $value): string
+    {
+        return preg_replace('/[^a-zA-Z0-9_\-.]/', '', $value);
     }
 
     /**

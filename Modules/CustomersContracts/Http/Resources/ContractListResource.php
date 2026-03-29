@@ -219,9 +219,10 @@ class ContractListResource extends JsonResource
      */
     protected static function can(string $fieldKey): bool
     {
-        // If permittedFields was never set, allow everything (backward compat)
         if (empty(static::$permittedFields)) {
-            return true;
+            \Log::warning('ContractListResource: permittedFields not initialized — denying all fields by default');
+
+            return false;
         }
 
         return isset(static::$permittedFields[$fieldKey]);

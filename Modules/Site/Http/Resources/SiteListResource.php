@@ -28,7 +28,7 @@ class SiteListResource extends JsonResource
             'is_uptodate' => $this->is_uptodate === 'YES',
             'admin_available' => $this->site_admin_available === 'YES',
             'frontend_available' => $this->site_frontend_available === 'YES',
-            'last_connection' => $this->last_connection?->toIso8601String(),
+            'last_connection' => $this->last_connection?->format('Y-m-d H:i:s'),
         ];
     }
 }

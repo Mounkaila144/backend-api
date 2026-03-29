@@ -305,9 +305,11 @@ class SiteRepository
                 'tables' => $tables,
             ];
         } catch (\Exception $e) {
+            \Log::warning('Tenant connection test failed', ['site_id' => $site->site_id, 'error' => $e->getMessage()]);
+
             return [
                 'success' => false,
-                'error' => $e->getMessage(),
+                'error' => 'Connection failed. Please verify database credentials and host accessibility.',
                 'host' => $site->site_db_host,
                 'port' => $site->site_db_port ?? 3306,
                 'ssl_enabled' => $site->site_db_ssl_enabled === 'YES',
@@ -335,27 +337,24 @@ class SiteRepository
      */
     protected function createTenantDatabase(array $data): void
     {
-        $dbName = $data['site_db_name'];
+        $dbName = $this->sanitizeIdentifier($data['site_db_name']);
 
-        // Créer la base de données
         DB::connection('mysql')->statement(
             "CREATE DATABASE IF NOT EXISTS `{$dbName}`
             CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
         );
 
-        // Créer l'utilisateur MySQL (si différent de root)
         if (!empty($data['site_db_login']) && $data['site_db_login'] !== 'root') {
-            $user = $data['site_db_login'];
-            $password = $data['site_db_password'];
-            $host = $data['site_db_host'] ?? 'localhost';
+            $user = $this->sanitizeIdentifier($data['site_db_login']);
+            $host = $this->sanitizeIdentifier($data['site_db_host'] ?? 'localhost');
+            $pdo = DB::connection('mysql')->getPdo();
+            $escapedPassword = $pdo->quote($data['site_db_password']);
 
-            // Créer l'utilisateur s'il n'existe pas
             DB::connection('mysql')->statement(
                 "CREATE USER IF NOT EXISTS '{$user}'@'{$host}'
-                IDENTIFIED BY '{$password}'"
+                IDENTIFIED BY {$escapedPassword}"
             );
 
-            // Donner les privilèges
             DB::connection('mysql')->statement(
                 "GRANT ALL PRIVILEGES ON `{$dbName}`.*
                 TO '{$user}'@'{$host}'"
@@ -370,20 +369,32 @@ class SiteRepository
      */
     protected function dropTenantDatabase(Tenant $site): void
     {
+        $dbName = $this->sanitizeIdentifier($site->site_db_name);
+
         DB::connection('mysql')->statement(
-            "DROP DATABASE IF EXISTS `{$site->site_db_name}`"
+            "DROP DATABASE IF EXISTS `{$dbName}`"
         );
 
-        // Optionnel : Supprimer l'utilisateur MySQL
         if ($site->site_db_login !== 'root') {
             try {
+                $user = $this->sanitizeIdentifier($site->site_db_login);
+                $host = $this->sanitizeIdentifier($site->site_db_host);
+
                 DB::connection('mysql')->statement(
-                    "DROP USER IF EXISTS '{$site->site_db_login}'@'{$site->site_db_host}'"
+                    "DROP USER IF EXISTS '{$user}'@'{$host}'"
                 );
             } catch (\Exception $e) {
                 // L'utilisateur peut être utilisé par d'autres bases
             }
         }
+    }
+
+    /**
+     * Sanitize a MySQL identifier (database name, username, host) to prevent injection.
+     */
+    protected function sanitizeIdentifier(string $value): string
+    {
+        return preg_replace('/[^a-zA-Z0-9_\-.]/', '', $value);
     }
 
     /**
@@ -506,7 +517,7 @@ class SiteRepository
 
             return [
                 'success' => false,
-                'message' => 'Erreur lors de l\'exécution des migrations: ' . $e->getMessage(),
+                'message' => 'Erreur lors de l\'exécution des migrations. Consultez les logs pour plus de détails.',
             ];
         }
     }
