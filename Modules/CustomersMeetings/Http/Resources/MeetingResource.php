@@ -160,7 +160,11 @@ class MeetingResource extends JsonResource
                 'product_id' => $p->product_id,
                 'details' => $p->details,
                 'status' => $p->status,
-                'product' => $p->relationLoaded('product') ? $p->product : null,
+                'product' => $p->relationLoaded('product') ? [
+                    'id' => $p->product->id,
+                    'reference' => $p->product->reference ?? null,
+                    'name' => $p->product->name ?? null,
+                ] : null,
             ])),
 
             // Comments
@@ -185,6 +189,56 @@ class MeetingResource extends JsonResource
 
             'created_at' => $this->created_at?->format('Y-m-d H:i:s'),
             'updated_at' => $this->updated_at?->format('Y-m-d H:i:s'),
+
+            // Domoprime Request (fiscal, habitat, surfaces)
+            'domoprime_request' => $this->whenLoaded('domoprimeRequest', fn () => $this->domoprimeRequest ? [
+                'id' => $this->domoprimeRequest->id,
+                // Fiscal
+                'revenue' => $this->domoprimeRequest->revenue,
+                'number_of_people' => $this->domoprimeRequest->number_of_people,
+                'number_of_children' => $this->domoprimeRequest->number_of_children,
+                'number_of_fiscal' => $this->domoprimeRequest->number_of_fiscal,
+                'number_of_parts' => $this->domoprimeRequest->number_of_parts,
+                'declarants' => $this->domoprimeRequest->declarants,
+                // Surfaces
+                'surface_home' => $this->domoprimeRequest->surface_home,
+                'surface_wall' => $this->domoprimeRequest->surface_wall,
+                'surface_top' => $this->domoprimeRequest->surface_top,
+                'surface_floor' => $this->domoprimeRequest->surface_floor,
+                'surface_ite' => $this->domoprimeRequest->surface_ite,
+                'parcel_surface' => $this->domoprimeRequest->parcel_surface,
+                'parcel_reference' => $this->domoprimeRequest->parcel_reference,
+                // Habitat
+                'more_2_years' => $this->domoprimeRequest->more_2_years,
+                'build_year' => $this->domoprimeRequest->build_year,
+                // FK IDs
+                'energy_id' => $this->domoprimeRequest->energy_id,
+                'previous_energy_id' => $this->domoprimeRequest->previous_energy_id,
+                'occupation_id' => $this->domoprimeRequest->occupation_id,
+                'layer_type_id' => $this->domoprimeRequest->layer_type_id,
+                'pricing_id' => $this->domoprimeRequest->pricing_id,
+                // Related entities
+                'energy' => $this->domoprimeRequest->relationLoaded('energy') && $this->domoprimeRequest->energy ? [
+                    'id' => $this->domoprimeRequest->energy->id,
+                    'name' => $this->domoprimeRequest->energy->name,
+                ] : null,
+                'previous_energy' => $this->domoprimeRequest->relationLoaded('previousEnergy') && $this->domoprimeRequest->previousEnergy ? [
+                    'id' => $this->domoprimeRequest->previousEnergy->id,
+                    'name' => $this->domoprimeRequest->previousEnergy->name,
+                ] : null,
+                'occupation' => $this->domoprimeRequest->relationLoaded('occupation') && $this->domoprimeRequest->occupation ? [
+                    'id' => $this->domoprimeRequest->occupation->id,
+                    'name' => $this->domoprimeRequest->occupation->name,
+                ] : null,
+                'layer_type' => $this->domoprimeRequest->relationLoaded('layerType') && $this->domoprimeRequest->layerType ? [
+                    'id' => $this->domoprimeRequest->layerType->id,
+                    'name' => $this->domoprimeRequest->layerType->name,
+                ] : null,
+                'pricing' => $this->domoprimeRequest->relationLoaded('pricing') && $this->domoprimeRequest->pricing ? [
+                    'id' => $this->domoprimeRequest->pricing->id,
+                    'name' => $this->domoprimeRequest->pricing->name,
+                ] : null,
+            ] : null),
         ];
     }
 

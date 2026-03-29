@@ -113,12 +113,15 @@ class Iso3ResultsController extends Controller
                     ])->first();
             }
 
-            // Step 5: Calculate QMAC per product
+            // Step 5: Calculate QMAC per product using the correct pricing table
+            // Symfony uses t_domoprime_iso_product_sector_energy_class (per class/cumac)
+            // NOT t_domoprime_product_sector_energy (generic)
             $productCalculations = $this->calculateProductPrices(
                 $contract,
                 $isoRequest,
                 $zone,
                 $energy,
+                $class,
                 $polluterPricing
             );
 
@@ -141,19 +144,49 @@ class Iso3ResultsController extends Controller
                 $user
             );
 
-            // Step 8: Return results
+            // Step 8: Get polluter details for ANAH section
+            $polluterCompany = \DB::connection('tenant')
+                ->table('t_partner_polluter_company')
+                ->find($contract->polluter_id);
+
+            $engineType = $polluterCompany?->type ?? null; // ITE, ISO, BOILER, PAC, TYPE1, TYPE2
+
+            $levelLabel = $class?->translations->first()?->value
+                ?? $class?->name
+                ?? '----';
+            $energyLabel = $energy?->translations->first()?->value
+                ?? $energy?->name;
+
+            // Step 9: Validate CUMAC engine per type (like Symfony per-type engines)
+            // Symfony throws "No price list" when:
+            // - No pricing found at all, OR
+            // - Products with surface have no corresponding pricing
+            //   (e.g., ITE product has surface_ite=2 but no pricing for cumac_id=5)
+            $cumacErrors = [];
+            if ($class && $energy) {
+                $hasProductWithSurfaceAndPricing = $productCalculations
+                    ->where('surface', '>', 0)
+                    ->where('qmac_value', '>', 0)
+                    ->isNotEmpty();
+
+                if (!$hasProductWithSurfaceAndPricing) {
+                    $cumacErrors[] = "Moteur CUMAC {$engineType}: Aucun tarif pour la classe [{$levelLabel}], "
+                        . "énergie [{$energyLabel}] et le secteur [{$zone->sectorModel?->name}]";
+                }
+            }
+
+            // Step 10: Return results (matching Symfony template structure)
             $info = [
                 'zone' => $zone->sectorModel?->name,
                 'region' => $region?->name,
-                'energy' => $energy?->translations->first()?->value
-                    ?? $energy?->name,
-                'level' => $class?->translations->first()?->value
-                    ?? $class?->name
-                    ?? '----',
+                'energy' => $energyLabel,
+                'revenue' => (float) $isoRequest->revenue,
+                'level' => $levelLabel,
+                'number_of_people' => (float) $isoRequest->number_of_people,
             ];
 
             $cumac = null;
-            if ($productCalculations->isNotEmpty()) {
+            if ($productCalculations->isNotEmpty() && empty($cumacErrors)) {
                 $cumac = [
                     'prices' => $productCalculations->map(fn (array $pc) => [
                         'qmac' => $pc['surface'] > 0 ? $pc['qmac_value'] : null,
@@ -163,12 +196,27 @@ class Iso3ResultsController extends Controller
                 ];
             }
 
+            // ANAH section (always shown for ITE/PAC/BOILER/TYPE1/TYPE2)
+            $anah = null;
+            if ($engineType && !in_array($engineType, ['ISO'])) {
+                $anah = [
+                    'engine' => $engineType . '2',
+                    'polluter_name' => $polluterCompany?->name,
+                    'number_of_parts' => (float) $isoRequest->number_of_parts,
+                    'level' => $levelLabel,
+                    'is_available' => $isAnaAvailable,
+                ];
+            }
+
             return response()->json([
                 'success' => true,
                 'data' => [
                     'has_polluter' => true,
+                    'engine_type' => $engineType,
                     'info' => $info,
                     'cumac' => $cumac,
+                    'cumac_errors' => $cumacErrors,
+                    'anah' => $anah,
                 ],
             ]);
         } catch (\Exception $e) {
@@ -232,20 +280,26 @@ class Iso3ResultsController extends Controller
     /**
      * Calculate QMAC prices for each product on the contract.
      *
-     * Flow per product:
-     * 1. Look up base price from DomoprimeProductSectorEnergy
-     * 2. Get the product's surface from the ISO request
-     * 3. Get the surface coefficient from the polluter's coefficient table
-     * 4. QMAC = base_price * surface * coefficient
+     * Uses t_domoprime_iso_product_sector_energy_class (like Symfony's per-type engines)
+     * NOT t_domoprime_product_sector_energy (generic table).
+     *
+     * Symfony flow:
+     * 1. Look up pricing from iso_product_sector_energy_class WHERE class_id, cumac_id, energy_id, sector_id
+     *    AND product_id is in the contract products
+     * 2. If no pricing found → throw "No price list" error
+     * 3. Get the product's surface from the ISO request
+     * 4. Get the surface coefficient from the polluter's coefficient table
+     * 5. QMAC = base_price * surface * coefficient
      */
     private function calculateProductPrices(
         CustomerContract $contract,
         DomoprimeIsoCustomerRequest $isoRequest,
         DomoprimeZone $zone,
         ?DomoprimeEnergy $energy,
+        ?DomoprimeClass $class,
         ?DomoprimePolluterClassSectorEnergy $polluterPricing
     ): Collection {
-        if (!$energy || !$polluterPricing) {
+        if (!$energy || !$class) {
             return collect();
         }
 
@@ -254,32 +308,37 @@ class Iso3ResultsController extends Controller
             return collect();
         }
 
-        // Get base prices for all products in one query
-        $basePrices = DomoprimeProductSectorEnergy::where('energy_id', $energy->id)
+        // Use the correct Symfony table: t_domoprime_iso_product_sector_energy_class
+        // This table has: energy_id, cumac_id, product_id, sector_id, class_id, price
+        $basePrices = \DB::connection('tenant')
+            ->table('t_domoprime_iso_product_sector_energy_class')
+            ->where('energy_id', $energy->id)
             ->where('sector_id', $zone->sector_id)
+            ->where('class_id', $class->id)
+            ->where('cumac_id', $isoRequest->pricing_id)
             ->whereIn('product_id', $productIds)
             ->get()
             ->keyBy('product_id');
 
+        // No pricing found = Symfony throws "No price list" error
+        if ($basePrices->isEmpty()) {
+            return collect(); // Will be caught by cumac_errors check
+        }
+
         // Pre-load surface coefficients for the polluter pricing
-        $surfaceCoefficients = $polluterPricing->coefficients;
+        $surfaceCoefficients = $polluterPricing?->coefficients ?? collect();
 
         // Build product-to-surface mapping
         $surfaceMap = $this->buildSurfaceMap($productIds, $isoRequest);
 
         $results = collect();
 
-        foreach ($productIds as $productId) {
-            $basePrice = $basePrices->get($productId);
-            if (!$basePrice) {
-                continue;
-            }
-
+        foreach ($basePrices as $productId => $basePrice) {
             $surface = $surfaceMap[$productId] ?? 0.0;
 
             // Look up surface coefficient from polluter's coefficient table
             $coef = 1.0;
-            if ($surface > 0) {
+            if ($surface > 0 && $surfaceCoefficients->isNotEmpty()) {
                 $matchingCoef = $surfaceCoefficients
                     ->where('min', '<=', $surface)
                     ->where('max', '>=', $surface)
@@ -502,6 +561,369 @@ class Iso3ResultsController extends Controller
             'accepted_by_id' => 0,
             'isLast' => 'YES',
             'status' => 'REFUSED',
+        ]);
+    }
+
+    /**
+     * ANAH-only results for a contract.
+     *
+     * Reproduces Symfony: ajaxResultsAnaForContractAction + app_domoprime_iso3_ajaxResultsAnaForContract.tpl
+     * Only runs the ANAH engine (DomoprimeResultAnaEngine), not the CUMAC engine.
+     *
+     * Template shows (for ITE/PAC/BOILER/TYPE1/TYPE2):
+     *   Engine, Polluter, Zone, Region, Energy, Revenue, Number of people,
+     *   Number of parts, Level, Anah availability
+     * For ISO: nothing (empty)
+     */
+    public function resultsAnaForContract(Request $request, int $contractId): JsonResponse
+    {
+        $lang = $request->query('lang', 'fr');
+
+        $contract = CustomerContract::with([
+            'customer.addresses' => fn ($q) => $q->where('status', 'ACTIVE'),
+            'polluter',
+            'domoprimeIsoRequest',
+        ])->find($contractId);
+
+        if (!$contract) {
+            return response()->json(['success' => false, 'message' => 'Contract not found'], 404);
+        }
+
+        if (!$contract->polluter_id) {
+            return response()->json([
+                'success' => true,
+                'data' => ['has_polluter' => false, 'anah' => null, 'errors' => []],
+            ]);
+        }
+
+        $withTranslations = fn ($q) => $q->where('lang', $lang);
+
+        $isoRequest = $contract->domoprimeIsoRequest->last();
+        $customer = $contract->customer;
+        $address = $customer?->addresses->first();
+
+        if (!$isoRequest || !$address) {
+            return response()->json([
+                'success' => true,
+                'data' => ['has_polluter' => true, 'anah' => null, 'errors' => ['Missing ISO request or customer address']],
+            ]);
+        }
+
+        try {
+            // Resolve zone, region, energy, class (same logic as resultsForContract)
+            $zone = $this->resolveZone($address->postcode);
+            if (!$zone) {
+                return response()->json([
+                    'success' => true,
+                    'data' => ['has_polluter' => true, 'anah' => null, 'errors' => ['Zone not found']],
+                ]);
+            }
+
+            $zone->load(['region', 'sectorModel']);
+            $region = $zone->region;
+
+            $energy = DomoprimeEnergy::with(['translations' => $withTranslations])
+                ->find($isoRequest->energy_id);
+
+            $class = $this->resolveClass(
+                $isoRequest->pricing_id,
+                $zone->region_id,
+                $isoRequest->revenue,
+                $isoRequest->number_of_people,
+                $withTranslations
+            );
+
+            // Get polluter details
+            $polluterCompany = \DB::connection('tenant')
+                ->table('t_partner_polluter_company')
+                ->find($contract->polluter_id);
+
+            $engineType = $polluterCompany?->type ?? null;
+            $levelLabel = $class?->translations->first()?->value ?? $class?->name ?? '----';
+            $energyLabel = $energy?->translations->first()?->value ?? $energy?->name;
+
+            // ANAH availability
+            $isAnaAvailable = $this->checkAnahAvailability(
+                $isoRequest->number_of_parts,
+                $isoRequest->revenue
+            );
+
+            // ISO type: empty (like Symfony template)
+            if ($engineType === 'ISO') {
+                return response()->json([
+                    'success' => true,
+                    'data' => ['has_polluter' => true, 'anah' => null, 'errors' => []],
+                ]);
+            }
+
+            // For ITE/PAC/BOILER/TYPE1/TYPE2: show full ANAH details
+            $anah = [
+                'engine' => ($engineType ?? '') . '2',
+                'polluter_name' => $polluterCompany?->name,
+                'zone' => $zone->sectorModel?->name,
+                'region' => $region?->name,
+                'energy' => $energyLabel,
+                'revenue' => (float) $isoRequest->revenue,
+                'number_of_people' => (float) $isoRequest->number_of_people,
+                'number_of_parts' => (float) $isoRequest->number_of_parts,
+                'level' => $levelLabel,
+                'is_available' => $isAnaAvailable,
+            ];
+
+            return response()->json([
+                'success' => true,
+                'data' => ['has_polluter' => true, 'anah' => $anah, 'errors' => []],
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'has_polluter' => true,
+                    'anah' => null,
+                    'errors' => [$e->getMessage()],
+                ],
+            ]);
+        }
+    }
+
+    /**
+     * Results for a meeting - finds the associated contract and delegates.
+     */
+    public function resultsForMeeting(Request $request, int $meetingId): JsonResponse
+    {
+        $meeting = \Modules\CustomersMeetings\Entities\CustomerMeeting::find($meetingId);
+
+        if (!$meeting) {
+            return response()->json(['success' => false, 'message' => 'Meeting not found'], 404);
+        }
+
+        // Find the contract linked to this meeting
+        $contract = CustomerContract::where('meeting_id', $meetingId)->first();
+
+        if (!$contract) {
+            // No contract yet - return meeting's own data (polluter, customer, address)
+            return $this->resultsForMeetingDirect($request, $meeting);
+        }
+
+        return $this->resultsForContract($request, $contract->id);
+    }
+
+    /**
+     * ANAH results for a meeting.
+     */
+    public function resultsAnaForMeeting(Request $request, int $meetingId): JsonResponse
+    {
+        $meeting = \Modules\CustomersMeetings\Entities\CustomerMeeting::with([
+            'customer.addresses' => fn ($q) => $q->where('status', 'ACTIVE'),
+        ])->find($meetingId);
+
+        if (!$meeting) {
+            return response()->json(['success' => false, 'message' => 'Meeting not found'], 404);
+        }
+
+        // If a contract exists, delegate to contract method
+        $contract = CustomerContract::where('meeting_id', $meetingId)->first();
+
+        if ($contract) {
+            return $this->resultsAnaForContract($request, $contract->id);
+        }
+
+        // No contract - compute ANAH directly from meeting data
+        if (!$meeting->polluter_id) {
+            return response()->json([
+                'success' => true,
+                'data' => ['has_polluter' => false, 'anah' => null, 'errors' => []],
+            ]);
+        }
+
+        $lang = $request->query('lang', 'fr');
+        $withTranslations = fn ($q) => $q->where('lang', $lang);
+
+        $polluterCompany = \DB::connection('tenant')
+            ->table('t_partner_polluter_company')
+            ->find($meeting->polluter_id);
+
+        $engineType = $polluterCompany?->type ?? null;
+
+        // ISO type: ANAH not available
+        if ($engineType === 'ISO') {
+            return response()->json([
+                'success' => true,
+                'data' => ['has_polluter' => true, 'anah' => null, 'errors' => []],
+            ]);
+        }
+
+        $isoRequest = \Modules\AppDomoprime\Entities\DomoprimeIsoCustomerRequest::where('meeting_id', $meeting->id)
+            ->latest()
+            ->first();
+
+        $customer = $meeting->customer;
+        $address = $customer?->addresses->first();
+
+        $errors = [];
+        $anah = null;
+
+        if (!$isoRequest || !$address) {
+            $errors[] = 'Missing ISO request or customer address';
+        } else {
+            try {
+                $zone = $this->resolveZone($address->postcode);
+
+                if (!$zone) {
+                    $errors[] = 'Zone not found for postcode: ' . $address->postcode;
+                } else {
+                    $zone->load(['region', 'sectorModel']);
+
+                    $energy = $isoRequest->energy_id
+                        ? DomoprimeEnergy::with(['translations' => $withTranslations])->find($isoRequest->energy_id)
+                        : null;
+
+                    $class = ($isoRequest->pricing_id && $zone->region_id)
+                        ? $this->resolveClass($isoRequest->pricing_id, $zone->region_id, $isoRequest->revenue, $isoRequest->number_of_people, $withTranslations)
+                        : null;
+
+                    $isAnaAvailable = $this->checkAnahAvailability(
+                        (float) ($isoRequest->number_of_parts ?? 0),
+                        (float) ($isoRequest->revenue ?? 0)
+                    );
+
+                    $levelLabel = $class?->translations->first()?->value ?? $class?->name ?? '----';
+                    $energyLabel = $energy?->translations->first()?->value ?? $energy?->name;
+
+                    if (!$class) {
+                        $regionName = $zone->region?->name ?? '?';
+                        $errors[] = "Cumac price for pricing and region {$regionName} and revenue " . number_format($isoRequest->revenue, 6) . " doesn't exist";
+                    }
+
+                    $anah = [
+                        'engine' => ($engineType ?? '') . '2',
+                        'polluter_name' => $polluterCompany?->name,
+                        'zone' => $zone->sectorModel?->name,
+                        'region' => $zone->region?->name,
+                        'energy' => $energyLabel,
+                        'revenue' => (float) ($isoRequest->revenue ?? 0),
+                        'number_of_people' => (float) ($isoRequest->number_of_people ?? 0),
+                        'number_of_parts' => (float) ($isoRequest->number_of_parts ?? 0),
+                        'level' => $levelLabel,
+                        'is_available' => $isAnaAvailable,
+                    ];
+                }
+            } catch (\Exception $e) {
+                $errors[] = $e->getMessage();
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => ['has_polluter' => true, 'anah' => $anah, 'errors' => $errors],
+        ]);
+    }
+
+    /**
+     * Direct results for meeting without contract (basic info only).
+     */
+    private function resultsForMeetingDirect(Request $request, $meeting): JsonResponse
+    {
+        $lang = $request->query('lang', 'fr');
+
+        if (!$meeting->polluter_id) {
+            return response()->json([
+                'success' => true,
+                'data' => ['has_polluter' => false, 'info' => null, 'cumac' => null],
+            ]);
+        }
+
+        $customer = $meeting->customer;
+        $address = $customer?->addresses?->where('status', 'ACTIVE')->first();
+
+        $polluterCompany = \DB::connection('tenant')
+            ->table('t_partner_polluter_company')
+            ->find($meeting->polluter_id);
+
+        $isoRequest = \Modules\AppDomoprime\Entities\DomoprimeIsoCustomerRequest::where('meeting_id', $meeting->id)
+            ->latest()
+            ->first();
+
+        $info = null;
+
+        if ($address && $isoRequest) {
+            $zone = $this->resolveZone($address->postcode);
+            $zone?->load(['region', 'sectorModel']);
+            $withTranslations = fn ($q) => $q->where('lang', $lang);
+
+            $energy = $isoRequest->energy_id
+                ? DomoprimeEnergy::with(['translations' => $withTranslations])->find($isoRequest->energy_id)
+                : null;
+
+            $class = ($isoRequest->pricing_id && $zone)
+                ? $this->resolveClass($isoRequest->pricing_id, $zone->region_id, $isoRequest->revenue, $isoRequest->number_of_people, $withTranslations)
+                : null;
+
+            $info = [
+                'zone' => $zone?->sectorModel?->name,
+                'region' => $zone?->region?->name,
+                'energy' => $energy?->translations->first()?->value ?? $energy?->name,
+                'revenue' => (float) ($isoRequest->revenue ?? 0),
+                'level' => $class?->translations->first()?->value ?? '----',
+                'number_of_people' => (float) ($isoRequest->number_of_people ?? 0),
+            ];
+        }
+
+        // Build CUMAC errors (like Symfony's engine error messages)
+        $engineType = $polluterCompany?->type ?? null;
+        $cumacErrors = [];
+
+        if ($info && $isoRequest) {
+            $zone = $this->resolveZone($address->postcode);
+            $withTranslations = fn ($q) => $q->where('lang', $lang);
+            $class = ($isoRequest->pricing_id && $zone)
+                ? $this->resolveClass($isoRequest->pricing_id, $zone->region_id, $isoRequest->revenue, $isoRequest->number_of_people, $withTranslations)
+                : null;
+
+            if (!$class) {
+                $regionName = $zone?->region?->name ?? '?';
+                $cumacErrors[] = "Cumac price for pricing and region {$regionName} and revenue " . number_format($isoRequest->revenue, 6) . " doesn't exist";
+            }
+        }
+
+        // Build ANAH section (like Symfony - for ITE/PAC/BOILER/TYPE1/TYPE2, not ISO)
+        $anah = null;
+
+        if ($engineType && $engineType !== 'ISO') {
+            $isAnaAvailable = false;
+
+            if ($isoRequest) {
+                $isAnaAvailable = $this->checkAnahAvailability(
+                    (float) ($isoRequest->number_of_parts ?? 0),
+                    (float) ($isoRequest->revenue ?? 0)
+                );
+            }
+
+            $levelLabel = '----';
+            if ($info) {
+                $levelLabel = $info['level'] ?? '----';
+            }
+
+            $anah = [
+                'engine' => $engineType . '2',
+                'polluter_name' => $polluterCompany?->name,
+                'number_of_parts' => (float) ($isoRequest?->number_of_parts ?? 0),
+                'level' => $levelLabel,
+                'is_available' => $isAnaAvailable,
+            ];
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'has_polluter' => true,
+                'engine_type' => $engineType,
+                'info' => $info,
+                'cumac' => null,
+                'cumac_errors' => $cumacErrors,
+                'anah' => $anah,
+            ],
         ]);
     }
 

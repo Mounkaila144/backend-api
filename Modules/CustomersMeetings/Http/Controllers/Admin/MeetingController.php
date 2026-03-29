@@ -115,6 +115,30 @@ class MeetingController extends Controller
         $oldData = $meeting->toArray();
         $meeting = $this->repository->update($meeting, $data);
 
+        // Update Domoprime Request if provided
+        if ($request->has('domoprime_request') && is_array($request->input('domoprime_request'))) {
+            $domoprimeData = $request->input('domoprime_request');
+            $domoprimeFields = [
+                'revenue', 'number_of_people', 'number_of_children', 'number_of_fiscal',
+                'number_of_parts', 'declarants', 'surface_home', 'surface_wall',
+                'surface_top', 'surface_floor', 'surface_ite', 'parcel_surface',
+                'parcel_reference', 'more_2_years', 'build_year',
+                'energy_id', 'previous_energy_id', 'occupation_id', 'layer_type_id', 'pricing_id',
+            ];
+            $filtered = array_intersect_key($domoprimeData, array_flip($domoprimeFields));
+
+            if (!empty($filtered)) {
+                $domoprimeRequest = $meeting->domoprimeRequest;
+                if ($domoprimeRequest) {
+                    $domoprimeRequest->update($filtered);
+                } else {
+                    $filtered['meeting_id'] = $meeting->id;
+                    $filtered['customer_id'] = $meeting->customer_id;
+                    \Modules\AppDomoprime\Entities\DomoprimeIsoCustomerRequest::create($filtered);
+                }
+            }
+        }
+
         // Update products
         if (isset($request->products)) {
             $meeting->products()->delete();
@@ -178,6 +202,38 @@ class MeetingController extends Controller
     public function history(int $id): JsonResponse
     {
         return response()->json(['success' => true, 'data' => $this->repository->getHistory($id)]);
+    }
+
+    /**
+     * GET /meetings/{id}/duplicate-mobile
+     * List meetings with same mobile number (like Symfony "RDVs avec le même mobile" tab).
+     */
+    public function duplicateMobile(int $id): JsonResponse
+    {
+        $meeting = \Modules\CustomersMeetings\Entities\CustomerMeeting::with('customer')->find($id);
+
+        if (!$meeting || !$meeting->customer) {
+            return response()->json(['success' => true, 'data' => []]);
+        }
+
+        $mobile = $meeting->customer->mobile;
+
+        if (!$mobile) {
+            return response()->json(['success' => true, 'data' => []]);
+        }
+
+        $duplicates = \Modules\CustomersMeetings\Entities\CustomerMeeting::query()
+            ->join('t_customers', 't_customers.id', '=', 't_customers_meeting.customer_id')
+            ->where('t_customers.mobile', $mobile)
+            ->where('t_customers_meeting.id', '!=', $id)
+            ->where('t_customers_meeting.status', 'ACTIVE')
+            ->select('t_customers_meeting.id', 't_customers_meeting.in_at', 't_customers_meeting.state_id',
+                't_customers.firstname', 't_customers.lastname', 't_customers.phone', 't_customers.mobile')
+            ->orderByDesc('t_customers_meeting.in_at')
+            ->limit(50)
+            ->get();
+
+        return response()->json(['success' => true, 'data' => $duplicates]);
     }
 
     protected function resolveCustomerData(array $data, ?int $existingCustomerId = null): array

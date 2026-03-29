@@ -3,6 +3,8 @@
 use Illuminate\Support\Facades\Route;
 use Modules\CustomersMeetings\Http\Controllers\Admin\MeetingActionController;
 use Modules\CustomersMeetings\Http\Controllers\Admin\MeetingController;
+use Modules\CustomersMeetings\Http\Controllers\Admin\MeetingSettingsController;
+use Modules\CustomersMeetings\Http\Controllers\Admin\MeetingConfigController;
 use Modules\CustomersMeetings\Http\Controllers\Admin\IndexController;
 
 /*
@@ -16,6 +18,49 @@ Route::prefix('api/admin')->middleware(['tenant', 'auth:sanctum'])->group(functi
         // Legacy placeholder routes
         Route::get('/legacy', [IndexController::class, 'index'])->name('legacy.index');
 
+        // Settings routes
+        Route::get('/settings', [MeetingSettingsController::class, 'show'])->name('settings.show');
+        Route::put('/settings', [MeetingSettingsController::class, 'update'])->name('settings.update');
+        Route::get('/settings/options', [MeetingSettingsController::class, 'options'])->name('settings.options');
+
+        // ─── Configuration CRUD (statuses, types, campaigns, ranges) ───
+        Route::prefix('config')->name('config.')->group(function () {
+            // Generic status CRUD (3 types: statuses, status-calls, status-leads)
+            Route::get('/{type}', [MeetingConfigController::class, 'statusIndex'])
+                ->where('type', 'statuses|status-calls|status-leads')
+                ->name('status.index');
+            Route::post('/{type}', [MeetingConfigController::class, 'statusStore'])
+                ->where('type', 'statuses|status-calls|status-leads')
+                ->name('status.store');
+            Route::get('/{type}/{id}', [MeetingConfigController::class, 'statusShow'])
+                ->where(['type' => 'statuses|status-calls|status-leads', 'id' => '[0-9]+'])
+                ->name('status.show');
+            Route::put('/{type}/{id}', [MeetingConfigController::class, 'statusUpdate'])
+                ->where(['type' => 'statuses|status-calls|status-leads', 'id' => '[0-9]+'])
+                ->name('status.update');
+            Route::delete('/{type}/{id}', [MeetingConfigController::class, 'statusDestroy'])
+                ->where(['type' => 'statuses|status-calls|status-leads', 'id' => '[0-9]+'])
+                ->name('status.destroy');
+
+            // Type CRUD (name + i18n, no color/icon)
+            Route::get('/types', [MeetingConfigController::class, 'typeIndex'])->name('types.index');
+            Route::post('/types', [MeetingConfigController::class, 'typeStore'])->name('types.store');
+            Route::put('/types/{id}', [MeetingConfigController::class, 'typeUpdate'])->name('types.update');
+            Route::delete('/types/{id}', [MeetingConfigController::class, 'typeDestroy'])->name('types.destroy');
+
+            // Campaign CRUD (name only, no i18n)
+            Route::get('/campaigns', [MeetingConfigController::class, 'campaignIndex'])->name('campaigns.index');
+            Route::post('/campaigns', [MeetingConfigController::class, 'campaignStore'])->name('campaigns.store');
+            Route::put('/campaigns/{id}', [MeetingConfigController::class, 'campaignUpdate'])->name('campaigns.update');
+            Route::delete('/campaigns/{id}', [MeetingConfigController::class, 'campaignDestroy'])->name('campaigns.destroy');
+
+            // Range Date CRUD
+            Route::get('/ranges', [MeetingConfigController::class, 'rangeIndex'])->name('ranges.index');
+            Route::post('/ranges', [MeetingConfigController::class, 'rangeStore'])->name('ranges.store');
+            Route::put('/ranges/{id}', [MeetingConfigController::class, 'rangeUpdate'])->name('ranges.update');
+            Route::delete('/ranges/{id}', [MeetingConfigController::class, 'rangeDestroy'])->name('ranges.destroy');
+        });
+
         // Main meeting routes
         Route::get('/meetings', [MeetingController::class, 'index'])->name('meetings.index');
         Route::post('/meetings', [MeetingController::class, 'store'])->name('meetings.store');
@@ -25,6 +70,7 @@ Route::prefix('api/admin')->middleware(['tenant', 'auth:sanctum'])->group(functi
         Route::put('/meetings/{id}', [MeetingController::class, 'update'])->name('meetings.update');
         Route::delete('/meetings/{id}', [MeetingController::class, 'destroy'])->name('meetings.destroy');
         Route::get('/meetings/{id}/history', [MeetingController::class, 'history'])->name('meetings.history');
+        Route::get('/meetings/{id}/duplicate-mobile', [MeetingController::class, 'duplicateMobile'])->name('meetings.duplicateMobile');
 
         // Meeting action routes
         Route::prefix('meetings/{id}')->group(function () {
@@ -59,7 +105,11 @@ Route::prefix('api/admin')->middleware(['tenant', 'auth:sanctum'])->group(functi
             Route::post('/send-email', [MeetingActionController::class, 'sendEmail'])->name('meetings.sendEmail');
 
             // Comments
+            Route::get('/comments', [MeetingActionController::class, 'listComments'])->name('meetings.listComments');
             Route::post('/comments', [MeetingActionController::class, 'addComment'])->name('meetings.addComment');
+
+            // History / Logs
+            Route::get('/logs', [MeetingActionController::class, 'listHistory'])->name('meetings.listHistory');
         });
     });
 });

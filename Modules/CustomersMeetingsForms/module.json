@@ -1,0 +1,11 @@
+{
+    "name": "CustomersMeetingsForms",
+    "alias": "customersmeetingsforms",
+    "description": "CustomersMeetingsForms module",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\CustomersMeetingsForms\\Providers\\CustomersMeetingsFormsServiceProvider"
+    ],
+    "files": []
+}

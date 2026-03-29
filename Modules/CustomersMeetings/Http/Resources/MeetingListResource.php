@@ -392,10 +392,17 @@ class MeetingListResource extends JsonResource
             }
         }
 
-        // Computed state flags
+        // Computed state flags (use static cache to avoid repeated S3/storage lookups)
         try {
-            $settings = app(MeetingSettingsService::class);
-            $cancelStatusId = $settings->getStatusForCancel();
+            static $cancelStatusId = null;
+            static $cancelStatusResolved = false;
+
+            if (!$cancelStatusResolved) {
+                $settings = app(MeetingSettingsService::class);
+                $cancelStatusId = $settings->getStatusForCancel();
+                $cancelStatusResolved = true;
+            }
+
             $data['is_cancelled'] = $cancelStatusId && $this->state_id === $cancelStatusId;
         } catch (\Throwable $e) {
             $data['is_cancelled'] = false;

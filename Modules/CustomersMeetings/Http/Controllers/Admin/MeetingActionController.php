@@ -7,6 +7,8 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\DB;
 use Modules\CustomersMeetings\Entities\CustomerMeeting;
+use Modules\CustomersMeetings\Entities\CustomerMeetingComment;
+use Modules\CustomersMeetings\Entities\CustomerMeetingHistory;
 use Modules\CustomersMeetings\Repositories\MeetingRepository;
 use Modules\CustomersMeetings\Services\MeetingSettingsService;
 
@@ -289,19 +291,85 @@ class MeetingActionController extends Controller
     {
         $meeting = $this->findOrFail($id);
 
-        $comment = $request->input('comment');
+        $commentText = $request->input('comment');
 
-        if (! $comment) {
+        if (! $commentText) {
             return response()->json(['success' => false, 'message' => 'Comment is required'], 422);
         }
 
-        $this->repository->logHistory($meeting, 'Comment: ' . $comment, $request->user());
+        return DB::connection('tenant')->transaction(function () use ($meeting, $commentText, $request) {
+            $comment = CustomerMeetingComment::create([
+                'meeting_id' => $meeting->id,
+                'comment' => $commentText,
+                'type' => 'USER',
+                'status' => 'ACTIVE',
+            ]);
+
+            $this->repository->logHistory($meeting, 'Comment: ' . $commentText, $request->user());
+
+            return response()->json([
+                'success' => true,
+                'action' => 'AddComment',
+                'id' => $meeting->id,
+                'comment' => [
+                    'id' => $comment->id,
+                    'comment' => $comment->comment,
+                    'type' => $comment->type,
+                    'created_at' => $comment->created_at?->format('Y-m-d H:i:s'),
+                    'user' => $request->user() ? [
+                        'id' => $request->user()->id,
+                        'firstname' => $request->user()->firstname,
+                        'lastname' => $request->user()->lastname,
+                    ] : null,
+                ],
+                'message' => 'Comment added successfully',
+            ]);
+        });
+    }
+
+    public function listComments(int $id): JsonResponse
+    {
+        $meeting = $this->findOrFail($id);
+
+        $comments = CustomerMeetingComment::where('meeting_id', $meeting->id)
+            ->where('status', 'ACTIVE')
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->map(fn ($c) => [
+                'id' => $c->id,
+                'comment' => $c->comment,
+                'type' => $c->type,
+                'created_at' => $c->created_at?->format('Y-m-d H:i:s'),
+            ]);
 
         return response()->json([
             'success' => true,
-            'action' => 'AddComment',
-            'id' => $meeting->id,
-            'message' => 'Comment added successfully',
+            'data' => $comments,
+        ]);
+    }
+
+    public function listHistory(int $id): JsonResponse
+    {
+        $meeting = $this->findOrFail($id);
+
+        $history = CustomerMeetingHistory::where('customer_id', $meeting->customer_id)
+            ->with(['user', 'oldStatus.translations', 'newStatus.translations'])
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->map(function ($h) {
+                return [
+                    'id' => $h->id,
+                    'comment' => $h->comment,
+                    'user' => $h->user ? ($h->user->firstname . ' ' . $h->user->lastname) : null,
+                    'old_status' => $h->oldStatus?->translations?->first()?->value,
+                    'new_status' => $h->newStatus?->translations?->first()?->value,
+                    'created_at' => $h->created_at?->format('Y-m-d H:i:s'),
+                ];
+            });
+
+        return response()->json([
+            'success' => true,
+            'data' => $history,
         ]);
     }
 

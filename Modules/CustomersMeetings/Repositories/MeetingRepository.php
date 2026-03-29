@@ -59,7 +59,12 @@ class MeetingRepository
         $eagerLoad = [
             'products',
             'comments' => fn ($q) => $q->where('status', 'ACTIVE')->orderBy('created_at', 'desc'),
-            'domoprimeRequest:id,meeting_id,surface_top,surface_wall,surface_floor',
+            'domoprimeRequest',
+            'domoprimeRequest.energy',
+            'domoprimeRequest.previousEnergy',
+            'domoprimeRequest.occupation',
+            'domoprimeRequest.layerType',
+            'domoprimeRequest.pricing',
         ];
 
         $permittedIndex = ! empty($permittedFields) ? array_flip($permittedFields) : [];
@@ -70,7 +75,7 @@ class MeetingRepository
                 if (str_contains($relation, '.translations')) {
                     $eagerLoad[$relation] = fn ($q) => $q->where('lang', $lang);
                 } elseif ($relation === 'customer.addresses') {
-                    $eagerLoad[$relation] = fn ($q) => $q->where('status', 'ACTIVE')->limit(1);
+                    $eagerLoad[$relation] = fn ($q) => $q->where('status', 'ACTIVE');
                 } else {
                     $eagerLoad[] = $relation;
                 }
@@ -291,7 +296,7 @@ class MeetingRepository
     public function findWithRelations(int $id): ?CustomerMeeting
     {
         return CustomerMeeting::with([
-            'customer.addresses' => fn ($q) => $q->where('status', 'ACTIVE')->limit(1),
+            'customer.addresses' => fn ($q) => $q->where('status', 'ACTIVE'),
             'telepro:id,firstname,lastname',
             'sales:id,firstname,lastname',
             'sale2:id,firstname,lastname',
@@ -314,7 +319,12 @@ class MeetingRepository
             'products',
             'comments' => fn ($q) => $q->where('status', 'ACTIVE')->orderBy('created_at', 'desc'),
             'history',
-            'domoprimeRequest:id,meeting_id,surface_top,surface_wall,surface_floor',
+            'domoprimeRequest',
+            'domoprimeRequest.energy',
+            'domoprimeRequest.previousEnergy',
+            'domoprimeRequest.occupation',
+            'domoprimeRequest.layerType',
+            'domoprimeRequest.pricing',
         ])->find($id);
     }
 
@@ -389,12 +399,18 @@ class MeetingRepository
 
     public function getFilterOptions(string $lang = 'fr'): array
     {
-        $formatStatus = fn ($collection) => $collection->map(fn ($s) => [
-            'id' => $s->id,
-            'name' => $s->translations->first()?->value ?? $s->name,
-        ]);
+        $formatStatus = fn ($collection) => $collection->map(function ($s) use ($lang) {
+            // Prefer exact lang match, fallback to empty lang, fallback to model name
+            $exactVal = $s->translations->firstWhere('lang', $lang)?->value;
+            $emptyVal = $s->translations->firstWhere('lang', '')?->value;
+            // Use first non-empty value in priority order
+            $name = (is_string($exactVal) && $exactVal !== '') ? $exactVal
+                  : ((is_string($emptyVal) && $emptyVal !== '') ? $emptyVal
+                  : ($s->name ?? ''));
+            return ['id' => $s->id, 'name' => $name];
+        })->filter(fn ($item) => $item['name'] !== '' && $item['name'] !== null)->values();
 
-        $withTranslations = fn ($q) => $q->where('lang', $lang);
+        $withTranslations = fn ($q) => $q->whereIn('lang', [$lang, '']);
 
         return [
             'meeting_statuses' => $formatStatus(
@@ -450,6 +466,45 @@ class MeetingRepository
                 ->select('t_products.id', 't_products.reference as name')
                 ->distinct()
                 ->orderBy('t_products.reference')
+                ->get()
+                ->map(fn ($p) => ['id' => $p->id, 'name' => $p->name]),
+            'energies' => DB::table('t_domoprime_energy as e')
+                ->leftJoin('t_domoprime_energy_i18n as i', function ($j) use ($lang) {
+                    $j->on('i.energy_id', '=', 'e.id')->where('i.lang', '=', $lang);
+                })
+                ->select('e.id', DB::raw('COALESCE(i.value, e.name) as name'))
+                ->orderBy('name')
+                ->get()
+                ->map(fn ($e) => ['id' => $e->id, 'name' => $e->name]),
+            'previous_energies' => DB::table('t_domoprime_previous_energy as e')
+                ->leftJoin('t_domoprime_previous_energy_i18n as i', function ($j) use ($lang) {
+                    $j->on('i.energy_id', '=', 'e.id')->where('i.lang', '=', $lang);
+                })
+                ->select('e.id', DB::raw('COALESCE(i.value, e.name) as name'))
+                ->orderBy('name')
+                ->get()
+                ->map(fn ($e) => ['id' => $e->id, 'name' => $e->name]),
+            'occupations' => DB::table('t_domoprime_iso_occupation as o')
+                ->leftJoin('t_domoprime_iso_occupation_i18n as i', function ($j) use ($lang) {
+                    $j->on('i.occupation_id', '=', 'o.id')->where('i.lang', '=', $lang);
+                })
+                ->select('o.id', DB::raw('COALESCE(i.value, o.name) as name'))
+                ->orderBy('name')
+                ->get()
+                ->map(fn ($o) => ['id' => $o->id, 'name' => $o->name]),
+            'layer_types' => DB::table('t_domoprime_iso_type_layer as l')
+                ->leftJoin('t_domoprime_iso_type_layer_i18n as i', function ($j) use ($lang) {
+                    $j->on('i.type_id', '=', 'l.id')->where('i.lang', '=', $lang);
+                })
+                ->select('l.id', DB::raw('COALESCE(i.value, l.name) as name'))
+                ->orderBy('name')
+                ->get()
+                ->map(fn ($l) => ['id' => $l->id, 'name' => $l->name]),
+            'pricings' => DB::table('t_domoprime_iso_cumac_price')
+                ->select('id', 'name')
+                ->where('is_active', 'YES')
+                ->where('status', 'ACTIVE')
+                ->orderBy('name')
                 ->get()
                 ->map(fn ($p) => ['id' => $p->id, 'name' => $p->name]),
         ];
