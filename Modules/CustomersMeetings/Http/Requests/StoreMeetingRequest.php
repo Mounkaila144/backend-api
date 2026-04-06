@@ -65,11 +65,11 @@ class StoreMeetingRequest extends FormRequest
             'polluter_id' => 'nullable|integer|exists:t_partner_polluter_company,id',
             'partner_layer_id' => 'nullable|integer|exists:t_partner_layer_company,id',
             'callcenter_id' => 'nullable|integer|exists:t_callcenter,id',
-            'campaign_id' => 'nullable|integer|exists:t_campaign,id',
+            'campaign_id' => 'nullable|integer|exists:t_customers_meeting_campaign,id',
             'type_id' => 'nullable|integer|exists:t_customers_meeting_type,id',
             'confirmator_id' => 'nullable|integer|exists:t_users,id',
             'status_call_id' => 'nullable|integer|exists:t_customers_meeting_status_call,id',
-            'status_lead_id' => 'nullable|integer|exists:t_customers_meeting_lead_status,id',
+            'status_lead_id' => 'nullable|integer|exists:t_customers_meeting_status_lead,id',
 
             // Date fields
             'in_at' => 'required|date',

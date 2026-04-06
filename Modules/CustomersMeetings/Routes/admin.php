@@ -6,6 +6,7 @@ use Modules\CustomersMeetings\Http\Controllers\Admin\MeetingController;
 use Modules\CustomersMeetings\Http\Controllers\Admin\MeetingSettingsController;
 use Modules\CustomersMeetings\Http\Controllers\Admin\MeetingConfigController;
 use Modules\CustomersMeetings\Http\Controllers\Admin\IndexController;
+use Modules\CustomersMeetings\Http\Controllers\Admin\TourGeneratorController;
 
 /*
 |--------------------------------------------------------------------------
@@ -63,6 +64,7 @@ Route::prefix('api/admin')->middleware(['tenant', 'auth:sanctum'])->group(functi
 
         // Main meeting routes
         Route::get('/meetings', [MeetingController::class, 'index'])->name('meetings.index');
+        Route::get('/meetings/schedule', [MeetingController::class, 'schedule'])->name('meetings.schedule');
         Route::post('/meetings', [MeetingController::class, 'store'])->name('meetings.store');
         Route::get('/meetings/filter-options', [MeetingController::class, 'filterOptions'])->name('meetings.filterOptions');
         Route::get('/meetings/statistics', [MeetingController::class, 'statistics'])->name('meetings.statistics');
@@ -93,6 +95,9 @@ Route::prefix('api/admin')->middleware(['tenant', 'auth:sanctum'])->group(functi
             // Callback management
             Route::patch('/cancel-callback', [MeetingActionController::class, 'cancelCallback'])->name('meetings.cancelCallback');
 
+            // Reschedule (drag-and-drop from calendar)
+            Route::patch('/reschedule', [MeetingActionController::class, 'reschedule'])->name('meetings.reschedule');
+
             // Copy & Recycle
             Route::post('/copy', [MeetingActionController::class, 'copy'])->name('meetings.copy');
             Route::patch('/recycle', [MeetingActionController::class, 'recycle'])->name('meetings.recycle');
@@ -110,6 +115,17 @@ Route::prefix('api/admin')->middleware(['tenant', 'auth:sanctum'])->group(functi
 
             // History / Logs
             Route::get('/logs', [MeetingActionController::class, 'listHistory'])->name('meetings.listHistory');
+        });
+
+        // Tour Generator routes
+        Route::prefix('tours')->name('tours.')->group(function () {
+            Route::get('/settings', [TourGeneratorController::class, 'settings'])->name('settings');
+            Route::put('/settings', [TourGeneratorController::class, 'updateSettings'])->name('settings.update');
+            Route::get('/by-range', [TourGeneratorController::class, 'byRange'])->name('byRange');
+            Route::post('/generate', [TourGeneratorController::class, 'generate'])->name('generate');
+            Route::get('/{id}', [TourGeneratorController::class, 'show'])->name('show');
+            Route::delete('/{id}', [TourGeneratorController::class, 'destroy'])->name('destroy');
+            Route::post('/{tourId}/groups/{groupId}/assign', [TourGeneratorController::class, 'assignSalesperson'])->name('assign');
         });
     });
 });

@@ -54,6 +54,35 @@ class MeetingRepository
         return $query->paginate($perPage);
     }
 
+    /**
+     * Get meetings for the schedule/calendar view (no pagination, all in date range).
+     */
+    public function getScheduleMeetings(array $filters): \Illuminate\Database\Eloquent\Collection
+    {
+        $lang = $filters['lang'] ?? 'fr';
+
+        $query = CustomerMeeting::query()
+            ->notInProgress();
+
+        $query->with([
+            'customer.addresses' => fn ($q) => $q->where('status', 'ACTIVE'),
+            'telepro:id,firstname,lastname',
+            'sales:id,firstname,lastname',
+            'sale2:id,firstname,lastname',
+            'assistant:id,firstname,lastname',
+            'meetingStatus.translations' => fn ($q) => $q->where('lang', $lang),
+            'statusCall.translations' => fn ($q) => $q->where('lang', $lang),
+            'campaign:id,name',
+            'callcenter',
+        ]);
+
+        $this->applyFilters($query, $filters);
+
+        $query->orderBy('in_at', 'asc');
+
+        return $query->get();
+    }
+
     protected function buildEagerLoad(array $permittedFields, string $lang): array
     {
         $eagerLoad = [
@@ -346,15 +375,23 @@ class MeetingRepository
         return $meeting->update(['status' => 'DELETE']);
     }
 
-    public function logHistory(CustomerMeeting $meeting, string $message, $user, ?int $oldStatusId = null, ?int $newStatusId = null): CustomerMeetingHistory
+    public function logHistory(CustomerMeeting $meeting, string $message, $user, ?int $oldStatusId = null, ?int $newStatusId = null): ?CustomerMeetingHistory
     {
         $stateId = $meeting->state_id ?: $meeting->getOriginal('state_id');
+
+        $oldId = (int) ($oldStatusId ?? $stateId);
+        $newId = (int) ($newStatusId ?? $stateId);
+
+        // FK constraint: status_id must reference a valid row, skip if 0
+        if ($oldId <= 0 || $newId <= 0) {
+            return null;
+        }
 
         return CustomerMeetingHistory::create([
             'customer_id' => $meeting->customer_id,
             'user_id' => $user->id,
-            'old_status_id' => $oldStatusId ?? $stateId,
-            'new_status_id' => $newStatusId ?? $stateId,
+            'old_status_id' => $oldId,
+            'new_status_id' => $newId,
             'comment' => $message,
         ]);
     }

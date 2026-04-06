@@ -184,6 +184,112 @@ class MeetingController extends Controller
         return response()->json(['success' => true, 'message' => 'Meeting deleted successfully']);
     }
 
+    /**
+     * GET /meetings/schedule
+     * Returns meetings for a date range, formatted for a calendar view.
+     * Query params: start (date), end (date), plus all standard filters.
+     */
+    public function schedule(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $start = $request->query('start', now()->startOfWeek()->toDateString());
+        $end = $request->query('end', now()->endOfWeek()->toDateString());
+
+        $filters = array_merge($request->all(), [
+            'in_at_from' => $start,
+            'in_at_to' => $end,
+            'status' => $request->query('status', 'ACTIVE'),
+        ]);
+
+        $meetings = $this->repository->getScheduleMeetings($filters);
+
+        $events = $meetings->map(function ($meeting) {
+            $customer = $meeting->customer;
+            $address = $customer?->addresses?->first();
+            $status = $meeting->meetingStatus;
+            $statusCall = $meeting->statusCall;
+
+            // Calendar end = in_at + 1h (meetings are single-day, only in_at matters)
+            $eventEnd = $meeting->in_at
+                ? \Carbon\Carbon::parse($meeting->in_at)->addHour()->toDateTimeString()
+                : null;
+
+            return [
+                'id' => $meeting->id,
+                'title' => $customer
+                    ? mb_strtoupper(trim($customer->lastname . ' ' . $customer->firstname))
+                    : 'Meeting #' . $meeting->id,
+                'start' => $meeting->in_at,
+                'end' => $eventEnd,
+                'backgroundColor' => $status?->color ?: '#3788d8',
+                'borderColor' => $status?->color ?: '#3788d8',
+                'extendedProps' => [
+                    'meeting_id' => $meeting->id,
+                    'registration' => $meeting->registration,
+                    'customer' => $customer ? [
+                        'id' => $customer->id,
+                        'name' => mb_strtoupper(trim($customer->lastname . ' ' . $customer->firstname)),
+                        'phone' => $customer->phone,
+                        'mobile' => $customer->mobile,
+                        'postcode' => $address?->postcode,
+                        'city' => $address?->city,
+                        'address' => $address?->address1,
+                    ] : null,
+                    'status' => $status ? [
+                        'id' => $status->id,
+                        'name' => $status->translations->first()?->value ?? $status->name,
+                        'color' => $status->color,
+                        'icon' => $status->icon,
+                    ] : null,
+                    'status_call' => $statusCall ? [
+                        'id' => $statusCall->id,
+                        'name' => $statusCall->translations->first()?->value ?? $statusCall->name,
+                        'color' => $statusCall->color,
+                    ] : null,
+                    'telepro' => $meeting->telepro ? [
+                        'id' => $meeting->telepro->id,
+                        'name' => mb_strtoupper(trim($meeting->telepro->lastname . ' ' . $meeting->telepro->firstname)),
+                    ] : null,
+                    'sales' => $meeting->sales ? [
+                        'id' => $meeting->sales->id,
+                        'name' => mb_strtoupper(trim($meeting->sales->lastname . ' ' . $meeting->sales->firstname)),
+                    ] : null,
+                    'sale2' => $meeting->sale2 ? [
+                        'id' => $meeting->sale2->id,
+                        'name' => mb_strtoupper(trim($meeting->sale2->lastname . ' ' . $meeting->sale2->firstname)),
+                    ] : null,
+                    'assistant' => $meeting->assistant ? [
+                        'id' => $meeting->assistant->id,
+                        'name' => mb_strtoupper(trim($meeting->assistant->lastname . ' ' . $meeting->assistant->firstname)),
+                    ] : null,
+                    'callcenter' => $meeting->callcenter ? [
+                        'id' => $meeting->callcenter->id,
+                        'name' => $meeting->callcenter->name,
+                    ] : null,
+                    'campaign' => $meeting->campaign ? [
+                        'id' => $meeting->campaign->id,
+                        'name' => $meeting->campaign->name,
+                    ] : null,
+                    'is_confirmed' => $meeting->is_confirmed,
+                    'in_at' => $meeting->in_at,
+                    'out_at' => $meeting->out_at,
+                    'remarks' => $meeting->remarks,
+                ],
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'data' => $events,
+            'meta' => [
+                'total' => $meetings->count(),
+                'start' => $start,
+                'end' => $end,
+            ],
+        ]);
+    }
+
     public function filterOptions(Request $request): JsonResponse
     {
         $lang = $request->query('lang', 'fr');

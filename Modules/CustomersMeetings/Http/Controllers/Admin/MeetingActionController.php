@@ -170,6 +170,48 @@ class MeetingActionController extends Controller
         return $this->actionResponse('CancelCallback', $meeting);
     }
 
+    // --- Reschedule ---
+
+    /**
+     * PATCH /meetings/{id}/reschedule
+     * Update meeting date/time (drag-and-drop from schedule view).
+     */
+    public function reschedule(int $id, Request $request): JsonResponse
+    {
+        $meeting = $this->repository->find($id);
+
+        if (! $meeting) {
+            return response()->json(['success' => false, 'message' => 'Meeting not found'], 404);
+        }
+
+        $request->validate([
+            'in_at' => 'required|date',
+            'out_at' => 'nullable|date|after:in_at',
+        ]);
+
+        $oldInAt = $meeting->in_at;
+        $meeting->in_at = $request->input('in_at');
+
+        if ($request->has('out_at')) {
+            $meeting->out_at = $request->input('out_at');
+        }
+
+        $meeting->save();
+
+        $this->repository->logHistory(
+            $meeting,
+            "Meeting rescheduled from {$oldInAt} to {$request->input('in_at')}",
+            $request->user()
+        );
+
+        return response()->json([
+            'success' => true,
+            'action' => 'RescheduleMeeting',
+            'id' => $meeting->id,
+            'message' => 'Meeting rescheduled successfully',
+        ]);
+    }
+
     // --- Copy ---
 
     public function copy(int $id, Request $request): JsonResponse

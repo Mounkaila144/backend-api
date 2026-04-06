@@ -99,6 +99,20 @@ class MeetingSettingsService
 
         // Default company
         'default_company_id' => null,
+
+        // Tour Generator settings
+        'tour_average_meeting_duration' => 45,
+        'tour_average_speed_kmh' => 45,
+        'tour_max_total_distance_limit' => 350,
+        'tour_dbscan_max_eps_km' => 20,
+        'tour_max_duration_hours' => 8,
+        'tour_max_duration_minutes' => 0,
+        'tour_openroute_server_url' => 'https://api.openrouteservice.org',
+        'tour_openroute_timeout' => 10,
+        'tour_openroute_api_key' => '',
+        'tour_data_gouv_endpoint' => 'https://api-adresse.data.gouv.fr',
+        'tour_data_gouv_timeout' => 5,
+        'tour_mapbox_access_token' => '',
     ];
 
     /**
@@ -353,5 +367,48 @@ class MeetingSettingsService
         }
 
         return (bool) $value;
+    }
+
+    // --- Tour Generator getters ---
+
+    public function getTourMaxEpsKm(): int
+    {
+        return (int) $this->get('tour_dbscan_max_eps_km', 20);
+    }
+
+    public function getTourMaxDurationSeconds(): int
+    {
+        return ((int) $this->get('tour_max_duration_hours', 8)) * 3600
+            + ((int) $this->get('tour_max_duration_minutes', 0)) * 60;
+    }
+
+    public function getTourAverageSpeedKmh(): int
+    {
+        return (int) $this->get('tour_average_speed_kmh', 45);
+    }
+
+    public function getTourOpenRouteApiKey(): string
+    {
+        return (string) $this->get('tour_openroute_api_key', '');
+    }
+
+    public function getTourOpenRouteUrl(): string
+    {
+        return (string) $this->get('tour_openroute_server_url', 'https://api.openrouteservice.org');
+    }
+
+    public function getTourOpenRouteTimeout(): int
+    {
+        return (int) $this->get('tour_openroute_timeout', 10);
+    }
+
+    public function getTourGeocodingEndpoint(): string
+    {
+        return (string) $this->get('tour_data_gouv_endpoint', 'https://api-adresse.data.gouv.fr');
+    }
+
+    public function getTourGeocodingTimeout(): int
+    {
+        return (int) $this->get('tour_data_gouv_timeout', 5);
     }
 }
