@@ -2,6 +2,7 @@
 
 namespace Modules\CustomersMeetings\Services;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -137,12 +138,46 @@ class MeetingSettingsService
         return $storageManager->getCurrentDisk();
     }
 
+    /**
+     * Process-level cache shared across all instances of this service for a given request.
+     * Avoids re-reading the .dat file from S3 (which can take 2+ seconds per read).
+     *
+     * @var array<string, array>
+     */
+    protected static array $configByTenant = [];
+
     protected function loadConfig(): array
     {
         if ($this->config !== null) {
             return $this->config;
         }
 
+        $tenant = \App\Models\Tenant::first();
+        $tenantKey = $tenant->site_id ?? 'default';
+
+        // 1. Static class-level cache (intra-request)
+        if (isset(self::$configByTenant[$tenantKey])) {
+            $this->config = self::$configByTenant[$tenantKey];
+            return $this->config;
+        }
+
+        // 2. Try cross-request cache (file driver — fast, no remote dependency)
+        $cacheKey = 'meeting_settings:' . $tenantKey;
+        $ttl = (int) config('meeting_settings.cache_ttl', 600);
+
+        try {
+            $cached = Cache::store('file')->get($cacheKey);
+            if (is_array($cached)) {
+                self::$configByTenant[$tenantKey] = $cached;
+                $this->config = $cached;
+                return $this->config;
+            }
+        } catch (\Throwable $e) {
+            // fall through to S3 read
+        }
+
+        // 3. Read from Storage (S3/local) and populate caches
+        $config = self::DEFAULTS;
         try {
             $disk = $this->getDisk();
             $path = $this->getSettingsPath();
@@ -152,26 +187,44 @@ class MeetingSettingsService
                 $saved = @unserialize($content);
 
                 if (is_array($saved)) {
-                    $this->config = array_merge(self::DEFAULTS, $saved);
-
-                    return $this->config;
+                    $config = array_merge(self::DEFAULTS, $saved);
                 }
             }
         } catch (\Throwable $e) {
-            // Fallback to defaults
+            // keep defaults
         }
 
-        $this->config = self::DEFAULTS;
+        try {
+            Cache::store('file')->put($cacheKey, $config, $ttl);
+        } catch (\Throwable $e) {
+            // best-effort cache write
+        }
 
+        self::$configByTenant[$tenantKey] = $config;
+        $this->config = $config;
         return $this->config;
     }
 
+    protected function clearCache(): void
+    {
+        $tenant = \App\Models\Tenant::first();
+        $tenantKey = $tenant->site_id ?? 'default';
+        unset(self::$configByTenant[$tenantKey]);
+
+        try {
+            Cache::store('file')->forget('meeting_settings:' . $tenantKey);
+        } catch (\Throwable $e) {
+            // ignore
+        }
+    }
+
     /**
-     * Force reload config on next access.
+     * Force reload config on next access (also invalidates Laravel cache).
      */
     public function refresh(): void
     {
         $this->config = null;
+        $this->clearCache();
     }
 
     /**
@@ -204,6 +257,9 @@ class MeetingSettingsService
         Storage::disk($disk)->put($path, serialize($merged));
 
         $this->config = $merged;
+
+        // Invalidate cache so other workers re-read the fresh config
+        $this->clearCache();
     }
 
     /**
