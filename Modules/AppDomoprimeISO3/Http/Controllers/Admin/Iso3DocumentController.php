@@ -786,6 +786,181 @@ class Iso3DocumentController extends Controller
         ]);
     }
 
+    /**
+     * List company document models for the contract's site company.
+     * Equivalent to Symfony /site_company_document/documentIteForViewContract.
+     *
+     * Joins t_site_company_model with t_site_company_model_i18n (current locale).
+     */
+    public function listCompanyModels(Request $request, int $contractId): JsonResponse
+    {
+        $contract = CustomerContract::find($contractId);
+        if (! $contract) {
+            return response()->json(['success' => false, 'message' => 'Contract not found'], 404);
+        }
+
+        $lang = $request->user()?->language ?? app()->getLocale() ?? 'fr';
+
+        $rows = \DB::connection('tenant')
+            ->table('t_site_company_model as m')
+            ->leftJoin('t_site_company_model_i18n as i18n', function ($join) use ($lang) {
+                $join->on('i18n.model_id', '=', 'm.id')->where('i18n.lang', '=', $lang);
+            })
+            ->select([
+                'm.id',
+                'm.name',
+                'm.extension',
+                'm.company_id',
+                'i18n.value',
+                'i18n.file',
+            ])
+            ->orderBy('i18n.value', 'asc')
+            ->get();
+
+        $models = $rows->map(fn ($r) => [
+            'id'      => (int) $r->id,
+            'name'    => $r->name,
+            'value'   => $r->value ?? $r->name,
+            'fileUrl' => $r->file
+                ? "/api/admin/appdomoprime-iso3/contracts/{$contractId}/company-models/{$r->id}/export"
+                : null,
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'data'    => ['models' => $models],
+        ]);
+    }
+
+    /**
+     * Stream a company model PDF for inline viewing or download.
+     *
+     * Resolution order: cloud (TenantStorageManager) → local Laravel storage → legacy Symfony path.
+     * Mirrors the convention used by Modules\CustomersDocuments\Http\Controllers\Admin\DocumentController::download.
+     *
+     * Symfony path: sites/{site_db_name}/frontend/data/models/documents/companies/{model_id}/{file}
+     */
+    public function exportCompanyModelPdf(Request $request, int $contractId, int $modelId)
+    {
+        $contract = CustomerContract::find($contractId);
+        if (! $contract) {
+            return response()->json(['success' => false, 'message' => 'Contract not found'], 404);
+        }
+
+        $lang = $request->user()?->language ?? app()->getLocale() ?? 'fr';
+
+        $row = \DB::connection('tenant')
+            ->table('t_site_company_model as m')
+            ->leftJoin('t_site_company_model_i18n as i18n', function ($join) use ($lang) {
+                $join->on('i18n.model_id', '=', 'm.id')->where('i18n.lang', '=', $lang);
+            })
+            ->where('m.id', $modelId)
+            ->select(['m.id', 'm.name', 'm.extension', 'i18n.file'])
+            ->first();
+
+        if (! $row || ! $row->file) {
+            return response()->json(['success' => false, 'message' => 'Model not found'], 404);
+        }
+
+        $fileName    = $row->file;
+        $displayName = ($row->name ?: 'document') . '.' . ($row->extension ?: 'pdf');
+        $relativePath = "frontend/data/models/documents/companies/{$row->id}/{$fileName}";
+        $headers = [
+            'Content-Type'        => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="' . $displayName . '"',
+            'Cache-Control'       => 'no-cache, must-revalidate',
+        ];
+
+        // 1) Cloud (S3/MinIO) via TenantStorageManager
+        try {
+            $tenant         = \App\Models\Tenant::first();
+            $storageManager = app(\Modules\Superadmin\Services\TenantStorageManager::class);
+            $fullPath       = $storageManager->getTenantPath($tenant->site_id) . "/{$relativePath}";
+            $disk           = $storageManager->getCurrentDisk();
+
+            if (\Illuminate\Support\Facades\Storage::disk($disk)->exists($fullPath)) {
+                return response()->streamDownload(
+                    fn () => print \Illuminate\Support\Facades\Storage::disk($disk)->get($fullPath),
+                    $displayName,
+                    $headers
+                );
+            }
+        } catch (\Throwable $e) {
+            // Fall through to filesystem fallbacks
+        }
+
+        // 2) Local Laravel storage + 3) legacy Symfony path
+        $siteName = \DB::connection('tenant')->getDatabaseName();
+        $candidates = [
+            storage_path("app/private/sites/{$siteName}/{$relativePath}"),
+            base_path("sites/{$siteName}/{$relativePath}"),
+            rtrim(config('migration.legacy_path'), '/\\') . "/sites/{$siteName}/{$relativePath}",
+        ];
+
+        foreach ($candidates as $path) {
+            if (is_file($path)) {
+                return response()->file($path, $headers);
+            }
+        }
+
+        return response()->json(['success' => false, 'message' => 'File not found'], 404);
+    }
+
+    /**
+     * List company document signatures for the contract.
+     * Equivalent to Symfony /app_domoprime_yousign_evidence/linkCompanyDocumentForViewContract.
+     *
+     * Returns one row per company model with the signature status from
+     * t_domoprime_yousign_evidence_company_document for this contract.
+     */
+    public function listCompanyDocSignatures(Request $request, int $contractId): JsonResponse
+    {
+        $contract = CustomerContract::find($contractId);
+        if (! $contract) {
+            return response()->json(['success' => false, 'message' => 'Contract not found'], 404);
+        }
+
+        $lang = $request->user()?->language ?? app()->getLocale() ?? 'fr';
+
+        $models = \DB::connection('tenant')
+            ->table('t_site_company_model as m')
+            ->leftJoin('t_site_company_model_i18n as i18n', function ($join) use ($lang) {
+                $join->on('i18n.model_id', '=', 'm.id')->where('i18n.lang', '=', $lang);
+            })
+            ->leftJoin('t_domoprime_yousign_evidence_company_document as sig', function ($join) use ($contractId) {
+                $join->on('sig.model_id', '=', 'm.id')->where('sig.contract_id', '=', $contractId);
+            })
+            ->leftJoin('t_services_yousign_evidence_file as file', 'file.id', '=', 'sig.sign_id')
+            ->select([
+                'm.id',
+                'm.name',
+                'i18n.value',
+                'sig.id as signature_id',
+                'file.is_signed',
+                'file.signed_at',
+            ])
+            ->orderBy('i18n.value', 'asc')
+            ->get();
+
+        $documents = $models->map(function ($r) {
+            $isSigned = ($r->is_signed ?? null) === 'YES';
+            $signedAt = $r->signed_at ?? null;
+            $hasValidDate = $isSigned && ! empty($signedAt) && $signedAt !== '0000-00-00 00:00:00';
+
+            return [
+                'id'        => (int) $r->id,
+                'modelName' => $r->value ?? $r->name,
+                'isSigned'  => $isSigned,
+                'signedAt'  => $hasValidDate ? $signedAt : null,
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'data'    => ['documents' => $documents],
+        ]);
+    }
+
     // ---------------------------------------------------------------
     // HTML builders for DomPDF
     // ---------------------------------------------------------------

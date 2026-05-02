@@ -103,6 +103,11 @@ Route::prefix('api/admin')->middleware(['tenant', 'auth:sanctum'])->group(functi
         Route::post('/quotations/{id}/refresh-reference', [Iso3DocumentController::class, 'refreshQuotationReference'])->name('quotations.refresh-reference');
         Route::get('/contracts/{contractId}/quotation-email-models', [Iso3DocumentController::class, 'listQuotationEmailModels'])->name('contracts.quotation-email-models');
 
+        // Company document models & signatures (Symfony: site_company_document + app_domoprime_yousign_evidence)
+        Route::get('/contracts/{contractId}/company-models', [Iso3DocumentController::class, 'listCompanyModels'])->name('contracts.company-models');
+        Route::get('/contracts/{contractId}/company-doc-signatures', [Iso3DocumentController::class, 'listCompanyDocSignatures'])->name('contracts.company-doc-signatures');
+        Route::get('/contracts/{contractId}/company-models/{modelId}/export', [Iso3DocumentController::class, 'exportCompanyModelPdf'])->name('contracts.company-model.export');
+
         // PDF Export
         Route::get('/export/quotation/{id}/pdf', [Iso3DocumentController::class, 'exportPdf'])->name('export.pdf');
         Route::get('/export/quotation/{id}/all-pdf', [Iso3DocumentController::class, 'exportAllPdf'])->name('export.all-pdf');
