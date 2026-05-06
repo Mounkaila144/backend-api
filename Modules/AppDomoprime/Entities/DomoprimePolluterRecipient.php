@@ -39,4 +39,9 @@ class DomoprimePolluterRecipient extends Model
     {
         return $this->belongsTo(PartnerPolluterCompany::class, 'polluter_id');
     }
+
+    public function recipient(): BelongsTo
+    {
+        return $this->belongsTo(PartnerRecipientCompany::class, 'recipient_id');
+    }
 }

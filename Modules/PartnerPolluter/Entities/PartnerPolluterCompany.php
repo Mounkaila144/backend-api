@@ -59,6 +59,7 @@ class PartnerPolluterCompany extends Model
         'is_default',
         'commercial',
         'type',
+        'layer_id',
     ];
 
     protected $casts = [
