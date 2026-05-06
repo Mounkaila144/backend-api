@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Modules\CustomersContracts\Entities\CustomerContract;
 
 /**
  * @property int $id
@@ -89,6 +90,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property \Illuminate\Support\Carbon|null $updated_at
  *
  * @property-read DomoprimeCalculation|null $calculation
+ * @property-read CustomerContract|null $contract
  * @property-read DomoprimeSubventionType|null $subventionType
  * @property-read \Illuminate\Database\Eloquent\Collection<int, DomoprimeQuotationProduct> $products
  * @property-read \Illuminate\Database\Eloquent\Collection<int, DomoprimeQuotationProductItem> $productItems
@@ -100,6 +102,41 @@ class DomoprimeQuotation extends Model
     protected $connection = 'tenant';
 
     protected $table = 't_domoprime_quotation';
+
+    /**
+     * Defaults for NOT NULL columns without DB-level DEFAULT (legacy schema).
+     * Without these, INSERTs fail with "Field 'X' doesn't have a default value"
+     * unless the engine sets every single field manually.
+     */
+    protected $attributes = [
+        'total_sale_101_with_tax' => 0,
+        'total_sale_101_without_tax' => 0,
+        'total_sale_102_with_tax' => 0,
+        'total_sale_102_without_tax' => 0,
+        'total_sale_103_with_tax' => 0,
+        'total_sale_103_without_tax' => 0,
+        'total_added_with_tax_wall' => 0,
+        'total_added_with_tax_floor' => 0,
+        'total_added_with_tax_top' => 0,
+        'total_added_without_tax_wall' => 0,
+        'total_added_without_tax_floor' => 0,
+        'total_added_without_tax_top' => 0,
+        'total_restincharge_with_tax_wall' => 0,
+        'total_restincharge_with_tax_floor' => 0,
+        'total_restincharge_with_tax_top' => 0,
+        'total_restincharge_without_tax_wall' => 0,
+        'total_restincharge_without_tax_floor' => 0,
+        'total_restincharge_without_tax_top' => 0,
+        'total_sale_discount_with_tax' => 0,
+        'total_sale_discount_without_tax' => 0,
+        'total_purchase_without_tax' => 0,
+        'total_purchase_with_tax' => 0,
+        'taxes' => '',
+        'fee_file' => 0,
+        'fixed_prime' => 0,
+        'comments' => '',
+        'status_id' => 0,
+    ];
 
     protected $fillable = [
         'reference',
@@ -252,6 +289,11 @@ class DomoprimeQuotation extends Model
     public function calculation(): BelongsTo
     {
         return $this->belongsTo(DomoprimeCalculation::class, 'calculation_id');
+    }
+
+    public function contract(): BelongsTo
+    {
+        return $this->belongsTo(CustomerContract::class, 'contract_id');
     }
 
     public function subventionType(): BelongsTo

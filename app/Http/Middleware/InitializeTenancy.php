@@ -42,11 +42,16 @@ class InitializeTenancy
 
         // Initialiser le contexte tenant
         tenancy()->initialize($tenant);
-        // Exécuter la requête
-        $response = $next($request);
 
-        // Terminer le contexte tenant
-        tenancy()->end();
+        // try/finally garantit que tenancy()->end() est appelé même si
+        // $next() lève une exception. Sans ça, le worker PHP-FPM resterait
+        // dans un état tenant pour la requête suivante (qui pourrait alors
+        // tenter de lire des données central avec une mauvaise connexion).
+        try {
+            $response = $next($request);
+        } finally {
+            tenancy()->end();
+        }
 
         return $response;
     }

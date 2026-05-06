@@ -57,6 +57,28 @@ class DomoprimeQuotationProduct extends Model
 
     protected $table = 't_domoprime_quotation_product';
 
+    /** Defaults for NOT NULL columns without DB-level DEFAULT (legacy schema). */
+    protected $attributes = [
+        'restincharge_price_with_tax' => 0,
+        'restincharge_price_without_tax' => 0,
+        'total_restincharge_price_with_tax' => 0,
+        'total_restincharge_price_without_tax' => 0,
+        'added_price_with_tax' => 0,
+        'added_price_without_tax' => 0,
+        'total_added_price_with_tax' => 0,
+        'total_added_price_without_tax' => 0,
+        'sale_standard_price_with_tax' => 0,
+        'sale_standard_price_without_tax' => 0,
+        'total_sale_standard_price_with_tax' => 0,
+        'total_sale_standard_price_without_tax' => 0,
+        'sale_discount_price_with_tax' => 0,
+        'sale_discount_price_without_tax' => 0,
+        'total_sale_discount_price_with_tax' => 0,
+        'total_sale_discount_price_without_tax' => 0,
+        'description' => '',
+        'details' => '',
+    ];
+
     protected $fillable = [
         'quotation_id',
         'title',

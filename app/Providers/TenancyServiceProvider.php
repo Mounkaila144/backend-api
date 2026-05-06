@@ -56,11 +56,14 @@ class TenancyServiceProvider extends ServiceProvider
         Event::listen(
             \Stancl\Tenancy\Events\TenancyEnded::class,
             function () {
-                // Revenir à la connexion centrale
-                DB::setDefaultConnection('mysql');
+                // Revenir à la connexion centrale. On lit la config au lieu
+                // de hard-coder 'mysql' pour rester aligné avec la config
+                // tenancy.database.central_connection (et le fallback DB_CONNECTION).
+                $central = config('tenancy.database.central_connection') ?: 'mysql';
+                DB::setDefaultConnection($central);
 
                 if (config('app.debug')) {
-                    logger()->info("Tenancy ended, switched back to central DB");
+                    logger()->info("Tenancy ended, switched back to central DB ({$central})");
                 }
             }
         );

@@ -2,7 +2,7 @@
 
 namespace Modules\AppDomoprimeISO3\Http\Controllers\Admin;
 
-use Barryvdh\DomPDF\Facade\Pdf;
+use Barryvdh\Snappy\Facades\SnappyPdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -15,6 +15,8 @@ use Modules\AppDomoprime\Entities\DomoprimeQuotationModel;
 use Modules\AppDomoprime\Entities\DomoprimeQuotationProductItem;
 use Modules\AppDomoprime\Entities\DomoprimeSubventionType;
 use Modules\AppDomoprime\Services\PreMeetingDocumentService;
+use Modules\AppDomoprimeISO3\Services\Documents\QuotationPdfGenerator;
+use Modules\AppDomoprimeISO3\Services\Documents\QuotationPdfStorage;
 use Modules\CustomersContracts\Entities\CustomerContract;
 
 class Iso3DocumentController extends Controller
@@ -218,7 +220,7 @@ class Iso3DocumentController extends Controller
                 'tva_id'                          => $product->tva_id,
                 'description'                     => $product->description,
                 'details'                         => $product->details,
-                'status'                          => $product->status,
+                'status'                          => $product->status ?: 'ACTIVE',
                 'purchase_price_with_tax'         => $product->purchase_price_with_tax,
                 'purchase_price_without_tax'      => $product->purchase_price_without_tax,
                 'sale_price_with_tax'             => $product->sale_price_with_tax,
@@ -373,39 +375,69 @@ class Iso3DocumentController extends Controller
     /**
      * Export a single quotation as PDF.
      *
-     * If the contract has a polluter with a pre-meeting model configured,
-     * generates the PDF using PDFtk form filling + logo overlay (same as old Symfony system).
-     * Otherwise falls back to DomPDF HTML generation.
+     * Mirrors Symfony's DomoprimeQuotationPDF2Base::output() exactly — the
+     * Symfony orchestrator calls `$this->create()` on every download, so the
+     * PDF always reflects the current contract/polluter/template state. We
+     * therefore call `regenerate()` (delete + recreate) instead of
+     * `getOrCreate()` to avoid serving a stale cached PDF when the admin
+     * has changed the polluter, the template body, or any quotation field.
+     *
+     * The S3 path layout is preserved (sites/{tenant}/frontend/data/
+     * domoprime/quotations/{id}/devis_{ref}_{id}.pdf) so the file remains
+     * accessible to other consumers (email attachments, signature flows).
      */
-    public function exportPdf(int $id): Response|BinaryFileResponse
-    {
-        $quotation = DomoprimeQuotation::with(['products', 'calculation', 'subventionType'])
-            ->findOrFail($id);
+    public function exportPdf(
+        int $id,
+        QuotationPdfStorage $storage,
+        QuotationPdfGenerator $generator,
+    ): Response|BinaryFileResponse {
+        $quotation = DomoprimeQuotation::with([
+            'products.items', 'calculation', 'subventionType',
+            'contract.customer.addresses', 'contract.polluter', 'contract.company',
+            'contract.domoprimeIsoRequest',
+        ])->findOrFail($id);
 
-        $contract = $quotation->contract_id
-            ? CustomerContract::with(['customer', 'polluter', 'company', 'partnerLayer'])->find($quotation->contract_id)
-            : null;
+        $bytes = $storage->regenerate(
+            $quotation,
+            fn () => $generator->generateToTempFile($quotation, 'fr')
+        );
 
-        // Try pre-meeting PDF generation (reproduces old Symfony system)
-        if ($contract && $contract->polluter_id) {
-            $preMeetingService = app(PreMeetingDocumentService::class);
-            $pdfPath = $preMeetingService->generate($contract);
-            if ($pdfPath && file_exists($pdfPath)) {
-                $filename = 'devis_' . ($quotation->reference ?: $quotation->id) . '.pdf';
-                return response()->download($pdfPath, $filename, [
-                    'Content-Type' => 'application/pdf',
-                ])->deleteFileAfterSend(true);
-            }
-        }
+        return response($bytes, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$storage->downloadFilename($quotation).'"',
+            'Content-Length' => strlen($bytes),
+        ]);
+    }
 
-        // Fallback: DomPDF HTML generation
-        $html = $this->buildQuotationHtml($quotation, $contract);
+    /**
+     * Force-regenerate a quotation PDF (bypasses the S3 cache).
+     * Used when an admin edits the BDD Smarty template and wants the PDF
+     * to reflect the new content immediately.
+     */
+    public function regeneratePdf(
+        int $id,
+        QuotationPdfStorage $storage,
+        QuotationPdfGenerator $generator,
+    ): JsonResponse {
+        $quotation = DomoprimeQuotation::with([
+            'products.items', 'calculation', 'subventionType',
+            'contract.customer.addresses', 'contract.polluter', 'contract.company',
+            'contract.domoprimeIsoRequest',
+        ])->findOrFail($id);
 
-        $pdf = Pdf::loadHTML($html)->setPaper('a4');
+        $bytes = $storage->regenerate(
+            $quotation,
+            fn () => $generator->generateToTempFile($quotation, 'fr')
+        );
 
-        $filename = 'devis_' . ($quotation->reference ?: $quotation->id) . '.pdf';
-
-        return $pdf->download($filename);
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'quotation_id' => $quotation->id,
+                'size_bytes' => strlen($bytes),
+                'filename' => $storage->downloadFilename($quotation),
+            ],
+        ]);
     }
 
     /**
@@ -428,7 +460,7 @@ class Iso3DocumentController extends Controller
             $html .= $this->buildBillingHtml($billing, $contract);
         }
 
-        $pdf = Pdf::loadHTML($html)->setPaper('a4');
+        $pdf = SnappyPdf::loadHTML($html);
 
         $filename = 'documents_' . ($quotation->reference ?: $quotation->id) . '.pdf';
 
@@ -453,7 +485,7 @@ class Iso3DocumentController extends Controller
 
         $html = $this->buildQuotationHtml($quotation, $contract, true);
 
-        $pdf = Pdf::loadHTML($html)->setPaper('a4');
+        $pdf = SnappyPdf::loadHTML($html);
 
         $filename = 'devis_signe_' . ($quotation->reference ?: $quotation->id) . '.pdf';
 
@@ -496,7 +528,7 @@ class Iso3DocumentController extends Controller
             <p><strong>Date:</strong> " . date('d/m/Y') . "</p>
         </body></html>";
 
-        return Pdf::loadHTML($html)->setPaper('a4')->download('document_pre_visite_' . $contractId . '.pdf');
+        return SnappyPdf::loadHTML($html)->download('document_pre_visite_' . $contractId . '.pdf');
     }
 
     /**
@@ -518,7 +550,7 @@ class Iso3DocumentController extends Controller
             <p><strong>Date:</strong> " . date('d/m/Y') . "</p>
         </body></html>";
 
-        return Pdf::loadHTML($html)->setPaper('a4')->download('document_fin_travaux_' . $contractId . '.pdf');
+        return SnappyPdf::loadHTML($html)->download('document_fin_travaux_' . $contractId . '.pdf');
     }
 
     /**
@@ -575,7 +607,7 @@ class Iso3DocumentController extends Controller
             : null;
 
         $html = $this->buildBillingHtml($billing, $contract);
-        $pdf = Pdf::loadHTML($html)->setPaper('a4');
+        $pdf = SnappyPdf::loadHTML($html);
         $filename = 'facture_' . ($billing->reference ?: $billing->id) . '.pdf';
 
         return $pdf->download($filename);
@@ -603,7 +635,7 @@ class Iso3DocumentController extends Controller
 
         // Generate PDF
         $html = $this->buildBillingHtml($billing, $contract);
-        $pdf = Pdf::loadHTML($html)->setPaper('a4');
+        $pdf = SnappyPdf::loadHTML($html);
         $pdfContent = $pdf->output();
 
         $filename = 'facture_' . ($billing->reference ?: $billing->id) . '.pdf';
@@ -729,7 +761,7 @@ class Iso3DocumentController extends Controller
 
         // Generate quotation PDF
         $html = $this->buildQuotationHtml($quotation, $contract);
-        $pdf = Pdf::loadHTML($html)->setPaper('a4');
+        $pdf = SnappyPdf::loadHTML($html);
         $pdfContent = $pdf->output();
         $filename = 'devis_' . ($quotation->reference ?: $quotation->id) . '.pdf';
 
@@ -962,7 +994,7 @@ class Iso3DocumentController extends Controller
     }
 
     // ---------------------------------------------------------------
-    // HTML builders for DomPDF
+    // HTML builders (rendered via wkhtmltopdf / Snappy)
     // ---------------------------------------------------------------
 
     private function buildQuotationHtml(

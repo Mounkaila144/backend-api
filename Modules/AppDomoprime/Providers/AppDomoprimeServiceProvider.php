@@ -4,6 +4,7 @@ namespace Modules\AppDomoprime\Providers;
 
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\ServiceProvider;
+use Modules\AppDomoprime\Services\Pdf\SmartyTemplateRenderer;
 
 class AppDomoprimeServiceProvider extends ServiceProvider
 {
@@ -23,6 +24,10 @@ class AppDomoprimeServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->register(RouteServiceProvider::class);
+
+        $this->app->singleton(SmartyTemplateRenderer::class, function () {
+            return new SmartyTemplateRenderer();
+        });
     }
 
     protected function registerConfig(): void

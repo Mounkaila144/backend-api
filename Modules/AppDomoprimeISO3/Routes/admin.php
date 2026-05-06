@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Modules\AppDomoprimeISO3\Http\Controllers\Admin\Iso3ResultsController;
 use Modules\AppDomoprimeISO3\Http\Controllers\Admin\Iso3DocumentController;
+use Modules\AppDomoprimeISO3\Http\Controllers\Admin\Iso3QuotationController;
 
 /*
 |--------------------------------------------------------------------------
@@ -21,6 +22,9 @@ Route::prefix('api/admin')->middleware(['tenant', 'auth:sanctum'])->group(functi
         // Results for meeting view (reuses contract logic via meeting->customer)
         Route::get('/meetings/{meetingId}/results', [Iso3ResultsController::class, 'resultsForMeeting'])
             ->name('meetings.results');
+
+        Route::get('/contracts/{contractId}/quotation-eligibility', [Iso3QuotationController::class, 'eligibility'])
+            ->name('contracts.quotation-eligibility');
 
         // ANAH-only results
         Route::get('/contracts/{contractId}/results-anah', [Iso3ResultsController::class, 'resultsAnaForContract'])
@@ -63,12 +67,13 @@ Route::prefix('api/admin')->middleware(['tenant', 'auth:sanctum'])->group(functi
         // Route::put('/quotations/meeting/{id}', [Iso3QuotationController::class, 'updateQuotationMeeting'])->name('quotations.meeting.update');
 
         // Quotations for Contract
-        // Route::post('/quotations/contract', [Iso3QuotationController::class, 'createQuotationContract'])->name('quotations.contract.store');
+        Route::get('/quotations/contracts/{contractId}/new-form', [Iso3QuotationController::class, 'getNewForm'])
+            ->name('quotations.contract.new-form');
+        Route::post('/quotations/contracts/{contractId}/simulate', [Iso3QuotationController::class, 'simulate'])
+            ->name('quotations.contract.simulate');
+        Route::post('/quotations/contracts/{contractId}/create', [Iso3QuotationController::class, 'createForContract'])
+            ->name('quotations.contract.create');
         // Route::put('/quotations/contract/{id}', [Iso3QuotationController::class, 'updateQuotationContract'])->name('quotations.contract.update');
-
-        // Results / Simulation
-        // Route::post('/quotations/simulate', [Iso3QuotationController::class, 'simulate'])->name('quotations.simulate');
-        // Route::get('/quotations/{id}/results', [Iso3QuotationController::class, 'getResults'])->name('quotations.results');
 
         // Billings & Quotations lists for contract/meeting view
         Route::get('/contracts/{contractId}/billings', [Iso3DocumentController::class, 'listBillings'])->name('contracts.billings');
@@ -110,6 +115,7 @@ Route::prefix('api/admin')->middleware(['tenant', 'auth:sanctum'])->group(functi
 
         // PDF Export
         Route::get('/export/quotation/{id}/pdf', [Iso3DocumentController::class, 'exportPdf'])->name('export.pdf');
+        Route::post('/export/quotation/{id}/regenerate-pdf', [Iso3DocumentController::class, 'regeneratePdf'])->name('export.regenerate-pdf');
         Route::get('/export/quotation/{id}/all-pdf', [Iso3DocumentController::class, 'exportAllPdf'])->name('export.all-pdf');
         Route::get('/export/quotation/{id}/signed-pdf', [Iso3DocumentController::class, 'exportSignedPdf'])->name('export.signed-pdf');
     });

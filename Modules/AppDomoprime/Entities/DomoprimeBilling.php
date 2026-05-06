@@ -96,6 +96,42 @@ class DomoprimeBilling extends Model
 
     protected $table = 't_domoprime_billing';
 
+    /**
+     * Defaults for NOT NULL columns without DB-level DEFAULT (legacy schema
+     * inherited from Symfony — same situation as DomoprimeQuotation). Without
+     * these, INSERTs fail with "Field 'X' doesn't have a default value"
+     * because the controller does not set every legacy column manually.
+     */
+    protected $attributes = [
+        'total_sale_101_with_tax' => 0,
+        'total_sale_101_without_tax' => 0,
+        'total_sale_102_with_tax' => 0,
+        'total_sale_102_without_tax' => 0,
+        'total_sale_103_with_tax' => 0,
+        'total_sale_103_without_tax' => 0,
+        'total_added_with_tax_wall' => 0,
+        'total_added_with_tax_floor' => 0,
+        'total_added_with_tax_top' => 0,
+        'total_added_without_tax_wall' => 0,
+        'total_added_without_tax_floor' => 0,
+        'total_added_without_tax_top' => 0,
+        'total_restincharge_with_tax_wall' => 0,
+        'total_restincharge_with_tax_floor' => 0,
+        'total_restincharge_with_tax_top' => 0,
+        'total_restincharge_without_tax_wall' => 0,
+        'total_restincharge_without_tax_floor' => 0,
+        'total_restincharge_without_tax_top' => 0,
+        'total_sale_discount_with_tax' => 0,
+        'total_sale_discount_without_tax' => 0,
+        'total_purchase_without_tax' => 0,
+        'total_purchase_with_tax' => 0,
+        'taxes' => '',
+        'fee_file' => 0,
+        'fixed_prime' => 0,
+        'comments' => '',
+        'status_id' => 0,
+    ];
+
     protected $fillable = [
         'reference',
         'month',

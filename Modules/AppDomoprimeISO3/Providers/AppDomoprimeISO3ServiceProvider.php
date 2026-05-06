@@ -4,6 +4,7 @@ namespace Modules\AppDomoprimeISO3\Providers;
 
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\ServiceProvider;
+use Modules\AppDomoprimeISO3\Console\ImportIso3SettingsCommand;
 
 class AppDomoprimeISO3ServiceProvider extends ServiceProvider
 {
@@ -18,6 +19,12 @@ class AppDomoprimeISO3ServiceProvider extends ServiceProvider
         $this->registerViews();
         $this->loadMigrationsFrom(module_path($this->moduleName, 'Database/migrations'));
         $this->registerRoutes();
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                ImportIso3SettingsCommand::class,
+            ]);
+        }
     }
 
     public function register(): void

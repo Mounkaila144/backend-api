@@ -48,6 +48,17 @@ class DomoprimeQuotationProductItem extends Model
 
     protected $table = 't_domoprime_quotation_product_item';
 
+    /** Defaults for NOT NULL columns without DB-level DEFAULT (legacy schema). */
+    protected $attributes = [
+        'sale_discount_price_with_tax' => 0,
+        'sale_discount_price_without_tax' => 0,
+        'total_sale_discount_price_with_tax' => 0,
+        'total_sale_discount_price_without_tax' => 0,
+        'unit_tax' => 0,
+        'description' => '',
+        'details' => '',
+    ];
+
     protected $fillable = [
         'quotation_id',
         'quotation_product_id',
