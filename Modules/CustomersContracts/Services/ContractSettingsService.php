@@ -71,7 +71,7 @@ class ContractSettingsService
      */
     protected function getSettingsPath(): string
     {
-        $tenant = \App\Models\Tenant::first();
+        $tenant = tenant() ?? \App\Models\Tenant::first();
         $storageManager = app(\Modules\Superadmin\Services\TenantStorageManager::class);
 
         return $storageManager->getTenantPath($tenant->site_id)
@@ -102,7 +102,7 @@ class ContractSettingsService
             return $this->config;
         }
 
-        $tenant = \App\Models\Tenant::first();
+        $tenant = tenant() ?? \App\Models\Tenant::first();
         $tenantKey = $tenant->site_id ?? 'default';
 
         // 1. Static class-level cache (intra-request)
@@ -134,7 +134,7 @@ class ContractSettingsService
 
             if (Storage::disk($disk)->exists($path)) {
                 $content = Storage::disk($disk)->get($path);
-                $saved = @unserialize($content);
+                $saved = @unserialize($content, ['allowed_classes' => false]);
 
                 if (is_array($saved)) {
                     $config = array_merge(self::DEFAULTS, $saved);
@@ -157,7 +157,7 @@ class ContractSettingsService
 
     protected function clearCache(): void
     {
-        $tenant = \App\Models\Tenant::first();
+        $tenant = tenant() ?? \App\Models\Tenant::first();
         $tenantKey = $tenant->site_id ?? 'default';
         unset(self::$configByTenant[$tenantKey]);
 

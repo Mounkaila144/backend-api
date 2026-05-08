@@ -1064,7 +1064,7 @@ class Iso3DocumentController extends Controller
 
         // 1) Cloud (S3/MinIO) via TenantStorageManager
         try {
-            $tenant         = \App\Models\Tenant::first();
+            $tenant         = tenant() ?? \App\Models\Tenant::first();
             $storageManager = app(\Modules\Superadmin\Services\TenantStorageManager::class);
             $fullPath       = $storageManager->getTenantPath($tenant->site_id) . "/{$relativePath}";
             $disk           = $storageManager->getCurrentDisk();

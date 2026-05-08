@@ -516,7 +516,7 @@ class ContractTabsController extends Controller
 
         // Try via TenantStorageManager first (S3 or local)
         try {
-            $tenant = \App\Models\Tenant::first();
+            $tenant = tenant() ?? \App\Models\Tenant::first();
             $storageManager = app(\Modules\Superadmin\Services\TenantStorageManager::class);
             $relativePath = "admin/data/contracts/documents/check/{$fileId}/{$fileName}";
             $fullPath = $storageManager->getTenantPath($tenant->site_id) . "/{$relativePath}";
@@ -625,7 +625,7 @@ class ContractTabsController extends Controller
 
             // Store file via TenantStorageManager (S3 or local)
             try {
-                $tenant = \App\Models\Tenant::first();
+                $tenant = tenant() ?? \App\Models\Tenant::first();
                 $storageManager = app(\Modules\Superadmin\Services\TenantStorageManager::class);
                 $storageManager->uploadFile(
                     $tenant->site_id,

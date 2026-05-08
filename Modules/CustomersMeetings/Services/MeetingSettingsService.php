@@ -121,11 +121,25 @@ class MeetingSettingsService
      */
     protected function getSettingsPath(): string
     {
-        $tenant = \App\Models\Tenant::first();
+        $tenant = tenant() ?? \App\Models\Tenant::first();
         $storageManager = app(\Modules\Superadmin\Services\TenantStorageManager::class);
 
         return $storageManager->getTenantPath($tenant->site_id)
             . '/' . self::SETTINGS_LAYER . '/data/settings/' . self::SETTINGS_FILE . '.dat';
+    }
+
+    /**
+     * Read the persisted payload safely.
+     *
+     * Format: PHP serialize() — identical to Symfony's mfSettingsBase, so the .dat file
+     * stays interoperable with the Symfony stack.
+     *
+     * `allowed_classes => false` blocks object instantiation: a malicious payload can
+     * no longer trigger __wakeup / __destruct / __toString gadgets (no POP chain, no RCE).
+     */
+    protected function decodePayload(string $content): mixed
+    {
+        return @unserialize($content, ['allowed_classes' => false]);
     }
 
     /**
@@ -152,7 +166,7 @@ class MeetingSettingsService
             return $this->config;
         }
 
-        $tenant = \App\Models\Tenant::first();
+        $tenant = tenant() ?? \App\Models\Tenant::first();
         $tenantKey = $tenant->site_id ?? 'default';
 
         // 1. Static class-level cache (intra-request)
@@ -184,7 +198,7 @@ class MeetingSettingsService
 
             if (Storage::disk($disk)->exists($path)) {
                 $content = Storage::disk($disk)->get($path);
-                $saved = @unserialize($content);
+                $saved = $this->decodePayload($content);
 
                 if (is_array($saved)) {
                     $config = array_merge(self::DEFAULTS, $saved);
@@ -207,7 +221,7 @@ class MeetingSettingsService
 
     protected function clearCache(): void
     {
-        $tenant = \App\Models\Tenant::first();
+        $tenant = tenant() ?? \App\Models\Tenant::first();
         $tenantKey = $tenant->site_id ?? 'default';
         unset(self::$configByTenant[$tenantKey]);
 
@@ -254,6 +268,8 @@ class MeetingSettingsService
         $disk = $this->getDisk();
         $path = $this->getSettingsPath();
 
+        // Same wire format as Symfony's mfSettingsBase. Read path uses
+        // unserialize(..., ['allowed_classes' => false]) to neutralize POP chains.
         Storage::disk($disk)->put($path, serialize($merged));
 
         $this->config = $merged;

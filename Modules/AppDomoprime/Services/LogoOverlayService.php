@@ -18,7 +18,7 @@ class LogoOverlayService
             return [];
         }
 
-        $options = @unserialize($optionsString);
+        $options = @unserialize($optionsString, ['allowed_classes' => false]);
 
         if ($options === false && $optionsString !== 'b:0;') {
             // Try JSON decode as fallback

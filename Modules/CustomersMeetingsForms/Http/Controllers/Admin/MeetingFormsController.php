@@ -50,7 +50,7 @@ class MeetingFormsController extends Controller
                 // Parse PHP-serialized parameters for choices
                 $choices = [];
                 if ($f->parameters) {
-                    $params = @unserialize($f->parameters);
+                    $params = @unserialize($f->parameters, ['allowed_classes' => false]);
                     if (is_array($params) && isset($params['choices']) && is_array($params['choices'])) {
                         $choices = array_values($params['choices']);
                     }
@@ -86,7 +86,7 @@ class MeetingFormsController extends Controller
         $savedValues = [];
         if ($formData && $formData->data) {
             // Try PHP unserialize first (Symfony format), then JSON fallback
-            $allData = @unserialize($formData->data);
+            $allData = @unserialize($formData->data, ['allowed_classes' => false]);
             if (!is_array($allData)) {
                 $allData = json_decode($formData->data, true);
             }
@@ -152,7 +152,7 @@ class MeetingFormsController extends Controller
             ->map(function ($f) {
                 $choices = [];
                 if ($f->parameters) {
-                    $params = @unserialize($f->parameters);
+                    $params = @unserialize($f->parameters, ['allowed_classes' => false]);
                     if (is_array($params) && isset($params['choices']) && is_array($params['choices'])) {
                         $choices = array_values($params['choices']);
                     }
@@ -182,7 +182,7 @@ class MeetingFormsController extends Controller
 
         $savedValues = [];
         if ($formData && $formData->data) {
-            $allData = @unserialize($formData->data);
+            $allData = @unserialize($formData->data, ['allowed_classes' => false]);
             if (!is_array($allData)) {
                 $allData = json_decode($formData->data, true);
             }
@@ -223,7 +223,7 @@ class MeetingFormsController extends Controller
 
         $allData = [];
         if ($existing && $existing->data) {
-            $allData = @unserialize($existing->data);
+            $allData = @unserialize($existing->data, ['allowed_classes' => false]);
             if (!is_array($allData)) {
                 $allData = [];
             }
@@ -282,7 +282,7 @@ class MeetingFormsController extends Controller
 
         $allData = [];
         if ($existing && $existing->data) {
-            $allData = @unserialize($existing->data);
+            $allData = @unserialize($existing->data, ['allowed_classes' => false]);
             if (!is_array($allData)) {
                 $allData = [];
             }
@@ -440,7 +440,7 @@ class MeetingFormsController extends Controller
             ->map(function ($f) {
                 $choices = [];
                 if ($f->parameters) {
-                    $params = @unserialize($f->parameters);
+                    $params = @unserialize($f->parameters, ['allowed_classes' => false]);
                     if (is_array($params) && isset($params['choices'])) {
                         $choices = array_values($params['choices']);
                     }

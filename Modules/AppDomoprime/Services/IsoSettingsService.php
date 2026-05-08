@@ -107,7 +107,7 @@ class IsoSettingsService
 
     protected function getSettingsPath(): string
     {
-        $tenant = \App\Models\Tenant::first();
+        $tenant = tenant() ?? \App\Models\Tenant::first();
         $storageManager = app(\Modules\Superadmin\Services\TenantStorageManager::class);
 
         return $storageManager->getTenantPath($tenant->site_id)
@@ -125,13 +125,13 @@ class IsoSettingsService
 
     protected function getCacheKey(): string
     {
-        $tenant = \App\Models\Tenant::first();
+        $tenant = tenant() ?? \App\Models\Tenant::first();
         return 'iso_settings:' . ($tenant->site_id ?? 'default');
     }
 
     protected function clearCache(): void
     {
-        $tenant = \App\Models\Tenant::first();
+        $tenant = tenant() ?? \App\Models\Tenant::first();
         $tenantKey = $tenant->site_id ?? 'default';
         unset(self::$configByTenant[$tenantKey]);
 
@@ -149,7 +149,7 @@ class IsoSettingsService
             return $this->config;
         }
 
-        $tenant = \App\Models\Tenant::first();
+        $tenant = tenant() ?? \App\Models\Tenant::first();
         $tenantKey = $tenant->site_id ?? 'default';
 
         if (isset(self::$configByTenant[$tenantKey])) {
@@ -175,7 +175,7 @@ class IsoSettingsService
 
             if (Storage::disk($disk)->exists($path)) {
                 $content = Storage::disk($disk)->get($path);
-                $saved   = @unserialize($content);
+                $saved   = @unserialize($content, ['allowed_classes' => false]);
 
                 if (is_array($saved)) {
                     $config = array_merge(self::DEFAULTS, $saved);

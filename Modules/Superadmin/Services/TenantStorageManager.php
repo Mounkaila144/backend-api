@@ -650,7 +650,7 @@ class TenantStorageManager implements TenantStorageManagerInterface
                 return null;
             }
 
-            $data = @unserialize($content);
+            $data = @unserialize($content, ['allowed_classes' => false]);
 
             if (!is_array($data)) {
                 return null;
