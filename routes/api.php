@@ -30,8 +30,11 @@ Route::get('/csrf-cookie', function () {
     return response()->noContent();
 })->name('api.csrf-cookie');
 
-// Permission routes (requires authentication)
-Route::middleware(['auth:sanctum', 'tenant'])->prefix('api/auth')->group(function () {
+// Permission routes (requires authentication).
+// NOTE: routes/api.php is auto-prefixed with 'api/' by withRouting(api: ...) in
+// bootstrap/app.php — so we only declare the path AFTER 'api/'. Using 'api/auth'
+// here would produce 'api/api/auth/...' (the bug we removed).
+Route::middleware(['tenant', 'auth:sanctum'])->prefix('auth')->group(function () {
     Route::get('/permissions', [PermissionController::class, 'index'])->name('api.permissions.index');
     Route::post('/permissions/check', [PermissionController::class, 'check'])->name('api.permissions.check');
     Route::post('/permissions/batch-check', [PermissionController::class, 'batchCheck'])->name('api.permissions.batch');

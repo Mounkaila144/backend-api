@@ -23,10 +23,16 @@ class UsersGuardServiceProvider extends ServiceProvider
 
     /**
      * Register the service provider.
+     *
+     * NOTE: We intentionally do NOT register UsersGuard's RouteServiceProvider here.
+     * The route files (admin/superadmin/frontend) are already loaded above via
+     * loadRoutesFrom(). Registering RouteServiceProvider in addition would re-wrap
+     * the same files in `Route::prefix('api')->group(...)`, producing duplicate
+     * routes at api/api/admin/* (and so on).
      */
     public function register(): void
     {
-        $this->app->register(RouteServiceProvider::class);
+        //
     }
 
     /**

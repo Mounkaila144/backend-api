@@ -1,9 +1,12 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use Modules\AppDomoprimeISO3\Http\Controllers\Admin\Iso3ResultsController;
-use Modules\AppDomoprimeISO3\Http\Controllers\Admin\Iso3DocumentController;
+use Modules\AppDomoprimeISO3\Http\Controllers\Admin\Iso3BillingController;
+use Modules\AppDomoprimeISO3\Http\Controllers\Admin\Iso3CompanyModelController;
+use Modules\AppDomoprimeISO3\Http\Controllers\Admin\Iso3EmailController;
+use Modules\AppDomoprimeISO3\Http\Controllers\Admin\Iso3ExportController;
 use Modules\AppDomoprimeISO3\Http\Controllers\Admin\Iso3QuotationController;
+use Modules\AppDomoprimeISO3\Http\Controllers\Admin\Iso3ResultsController;
 
 /*
 |--------------------------------------------------------------------------
@@ -33,7 +36,7 @@ Route::prefix('api/admin')->middleware(['api', 'tenant', 'auth:sanctum'])->group
             ->name('meetings.results-anah');
 
         // Quotations for meeting
-        Route::get('/meetings/{meetingId}/quotations', [Iso3DocumentController::class, 'listQuotationsForMeeting'])
+        Route::get('/meetings/{meetingId}/quotations', [Iso3QuotationController::class, 'listQuotationsForMeeting'])
             ->name('meetings.quotations');
 
         // Settings & Dates
@@ -84,54 +87,54 @@ Route::prefix('api/admin')->middleware(['api', 'tenant', 'auth:sanctum'])->group
         // Route::put('/quotations/contract/{id}', [Iso3QuotationController::class, 'updateQuotationContract'])->name('quotations.contract.update');
 
         // Billings & Quotations lists for contract/meeting view
-        Route::get('/contracts/{contractId}/billings', [Iso3DocumentController::class, 'listBillings'])->name('contracts.billings');
-        Route::get('/contracts/{contractId}/quotations', [Iso3DocumentController::class, 'listQuotations'])->name('contracts.quotations');
+        Route::get('/contracts/{contractId}/billings', [Iso3BillingController::class, 'listBillings'])->name('contracts.billings');
+        Route::get('/contracts/{contractId}/quotations', [Iso3QuotationController::class, 'listQuotations'])->name('contracts.quotations');
         // Route::get('/meetings/{meetingId}/quotations', [Iso3QuotationController::class, 'listMeetingQuotations'])->name('meetings.quotations');
 
         // Quotation Show / Edit
-        Route::get('/quotations/subvention-types', [Iso3DocumentController::class, 'listSubventionTypes'])->name('quotations.subvention-types');
-        Route::get('/quotations/{id}', [Iso3DocumentController::class, 'showQuotation'])->name('quotations.show');
-        Route::put('/quotations/{id}', [Iso3DocumentController::class, 'updateQuotation'])->name('quotations.update');
+        Route::get('/quotations/subvention-types', [Iso3QuotationController::class, 'listSubventionTypes'])->name('quotations.subvention-types');
+        Route::get('/quotations/{id}', [Iso3QuotationController::class, 'showQuotation'])->name('quotations.show');
+        Route::put('/quotations/{id}', [Iso3QuotationController::class, 'updateQuotation'])->name('quotations.update');
 
         // Quotation Actions
-        Route::patch('/quotations/{id}/disable', [Iso3DocumentController::class, 'disableQuotation'])->name('quotations.disable');
-        Route::patch('/quotations/{id}/enable', [Iso3DocumentController::class, 'enableQuotation'])->name('quotations.enable');
-        Route::delete('/quotations/{id}', [Iso3DocumentController::class, 'destroyQuotation'])->name('quotations.destroy');
-        Route::post('/quotations/{id}/create-billing', [Iso3DocumentController::class, 'createBillingFromQuotation'])->name('quotations.create-billing');
+        Route::patch('/quotations/{id}/disable', [Iso3QuotationController::class, 'disableQuotation'])->name('quotations.disable');
+        Route::patch('/quotations/{id}/enable', [Iso3QuotationController::class, 'enableQuotation'])->name('quotations.enable');
+        Route::delete('/quotations/{id}', [Iso3QuotationController::class, 'destroyQuotation'])->name('quotations.destroy');
+        Route::post('/quotations/{id}/create-billing', [Iso3BillingController::class, 'createBillingFromQuotation'])->name('quotations.create-billing');
 
         // Contract-level document PDF exports
-        Route::get('/contracts/{contractId}/export/premeeting-pdf', [Iso3DocumentController::class, 'exportPreMeetingPdf'])->name('contracts.export.premeeting-pdf');
+        Route::get('/contracts/{contractId}/export/premeeting-pdf', [Iso3ExportController::class, 'exportPreMeetingPdf'])->name('contracts.export.premeeting-pdf');
         // Meeting-level document PDF exports (Story M1)
-        Route::get('/meetings/{meetingId}/export/premeeting-pdf', [Iso3DocumentController::class, 'exportPreMeetingPdfForMeeting'])->name('meetings.export.premeeting-pdf');
-        Route::get('/contracts/{contractId}/export/afterwork-pdf', [Iso3DocumentController::class, 'exportAfterWorkPdf'])->name('contracts.export.afterwork-pdf');
-        Route::get('/contracts/{contractId}/export/all-documents-pdf', [Iso3DocumentController::class, 'exportAllDocumentsByContractPdf'])->name('contracts.export.all-documents-pdf');
-        Route::get('/contracts/{contractId}/export/all-signed-pdf', [Iso3DocumentController::class, 'exportAllSignedByContractPdf'])->name('contracts.export.all-signed-pdf');
+        Route::get('/meetings/{meetingId}/export/premeeting-pdf', [Iso3ExportController::class, 'exportPreMeetingPdfForMeeting'])->name('meetings.export.premeeting-pdf');
+        Route::get('/contracts/{contractId}/export/afterwork-pdf', [Iso3ExportController::class, 'exportAfterWorkPdf'])->name('contracts.export.afterwork-pdf');
+        Route::get('/contracts/{contractId}/export/all-documents-pdf', [Iso3ExportController::class, 'exportAllDocumentsByContractPdf'])->name('contracts.export.all-documents-pdf');
+        Route::get('/contracts/{contractId}/export/all-signed-pdf', [Iso3ExportController::class, 'exportAllSignedByContractPdf'])->name('contracts.export.all-signed-pdf');
 
         // Official ITE AH documents (devis & facture uniques signés)
         // Symfony: /app_domoprime_iso3/documentITEForViewContract + documentITEBillingForViewContract
-        Route::get('/contracts/{contractId}/export/ite-ah-quotation-pdf', [Iso3DocumentController::class, 'exportIteAhQuotationPdf'])->name('contracts.export.ite-ah-quotation-pdf');
-        Route::get('/contracts/{contractId}/export/ite-ah-billing-pdf', [Iso3DocumentController::class, 'exportIteAhBillingPdf'])->name('contracts.export.ite-ah-billing-pdf');
+        Route::get('/contracts/{contractId}/export/ite-ah-quotation-pdf', [Iso3ExportController::class, 'exportIteAhQuotationPdf'])->name('contracts.export.ite-ah-quotation-pdf');
+        Route::get('/contracts/{contractId}/export/ite-ah-billing-pdf', [Iso3ExportController::class, 'exportIteAhBillingPdf'])->name('contracts.export.ite-ah-billing-pdf');
 
         // Billing Actions
-        Route::get('/export/billing/{id}/pdf', [Iso3DocumentController::class, 'exportBillingPdf'])->name('export.billing-pdf');
-        Route::post('/billings/{id}/send-email', [Iso3DocumentController::class, 'sendBillingEmail'])->name('billings.send-email');
-        Route::post('/billings/{id}/create-asset', [Iso3DocumentController::class, 'createAssetFromBilling'])->name('billings.create-asset');
+        Route::get('/export/billing/{id}/pdf', [Iso3ExportController::class, 'exportBillingPdf'])->name('export.billing-pdf');
+        Route::post('/billings/{id}/send-email', [Iso3EmailController::class, 'sendBillingEmail'])->name('billings.send-email');
+        Route::post('/billings/{id}/create-asset', [Iso3BillingController::class, 'createAssetFromBilling'])->name('billings.create-asset');
 
         // Quotation extra actions
-        Route::post('/quotations/{id}/update-last-billing', [Iso3DocumentController::class, 'updateBillingFromLastQuotation'])->name('quotations.update-last-billing');
-        Route::post('/quotations/{id}/send-email', [Iso3DocumentController::class, 'sendQuotationEmail'])->name('quotations.send-email');
-        Route::post('/quotations/{id}/refresh-reference', [Iso3DocumentController::class, 'refreshQuotationReference'])->name('quotations.refresh-reference');
-        Route::get('/contracts/{contractId}/quotation-email-models', [Iso3DocumentController::class, 'listQuotationEmailModels'])->name('contracts.quotation-email-models');
+        Route::post('/quotations/{id}/update-last-billing', [Iso3BillingController::class, 'updateBillingFromLastQuotation'])->name('quotations.update-last-billing');
+        Route::post('/quotations/{id}/send-email', [Iso3EmailController::class, 'sendQuotationEmail'])->name('quotations.send-email');
+        Route::post('/quotations/{id}/refresh-reference', [Iso3QuotationController::class, 'refreshQuotationReference'])->name('quotations.refresh-reference');
+        Route::get('/contracts/{contractId}/quotation-email-models', [Iso3EmailController::class, 'listQuotationEmailModels'])->name('contracts.quotation-email-models');
 
         // Company document models & signatures (Symfony: site_company_document + app_domoprime_yousign_evidence)
-        Route::get('/contracts/{contractId}/company-models', [Iso3DocumentController::class, 'listCompanyModels'])->name('contracts.company-models');
-        Route::get('/contracts/{contractId}/company-doc-signatures', [Iso3DocumentController::class, 'listCompanyDocSignatures'])->name('contracts.company-doc-signatures');
-        Route::get('/contracts/{contractId}/company-models/{modelId}/export', [Iso3DocumentController::class, 'exportCompanyModelPdf'])->name('contracts.company-model.export');
+        Route::get('/contracts/{contractId}/company-models', [Iso3CompanyModelController::class, 'listCompanyModels'])->name('contracts.company-models');
+        Route::get('/contracts/{contractId}/company-doc-signatures', [Iso3CompanyModelController::class, 'listCompanyDocSignatures'])->name('contracts.company-doc-signatures');
+        Route::get('/contracts/{contractId}/company-models/{modelId}/export', [Iso3ExportController::class, 'exportCompanyModelPdf'])->name('contracts.company-model.export');
 
         // PDF Export
-        Route::get('/export/quotation/{id}/pdf', [Iso3DocumentController::class, 'exportPdf'])->name('export.pdf');
-        Route::post('/export/quotation/{id}/regenerate-pdf', [Iso3DocumentController::class, 'regeneratePdf'])->name('export.regenerate-pdf');
-        Route::get('/export/quotation/{id}/all-pdf', [Iso3DocumentController::class, 'exportAllPdf'])->name('export.all-pdf');
-        Route::get('/export/quotation/{id}/signed-pdf', [Iso3DocumentController::class, 'exportSignedPdf'])->name('export.signed-pdf');
+        Route::get('/export/quotation/{id}/pdf', [Iso3ExportController::class, 'exportPdf'])->name('export.pdf');
+        Route::post('/export/quotation/{id}/regenerate-pdf', [Iso3ExportController::class, 'regeneratePdf'])->name('export.regenerate-pdf');
+        Route::get('/export/quotation/{id}/all-pdf', [Iso3ExportController::class, 'exportAllPdf'])->name('export.all-pdf');
+        Route::get('/export/quotation/{id}/signed-pdf', [Iso3ExportController::class, 'exportSignedPdf'])->name('export.signed-pdf');
     });
 });

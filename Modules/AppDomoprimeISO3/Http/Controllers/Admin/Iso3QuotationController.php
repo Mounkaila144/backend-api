@@ -7,6 +7,9 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
 use InvalidArgumentException;
+use Modules\AppDomoprime\Entities\DomoprimeQuotation;
+use Modules\AppDomoprime\Entities\DomoprimeQuotationProductItem;
+use Modules\AppDomoprime\Entities\DomoprimeSubventionType;
 use Modules\AppDomoprimeISO3\Services\Quotations\QuotationEligibilityChecker;
 use Modules\AppDomoprimeISO3\Services\Quotations\QuotationEngineFactory;
 use Modules\AppDomoprimeISO3\Services\Quotations\QuotationFormBuilder;
@@ -229,6 +232,217 @@ class Iso3QuotationController extends Controller
         return response()->json([
             'success' => true,
             'data' => $this->serializeQuotation($quotation),
+        ]);
+    }
+
+    // ------------------------------------------------------------------
+    // Quotation Listing / Show / Update / Lifecycle
+    // ------------------------------------------------------------------
+
+    /**
+     * List all quotations for a contract.
+     */
+    public function listQuotations(Request $request, int $contractId): JsonResponse
+    {
+        $contract = CustomerContract::find($contractId);
+
+        if (! $contract) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Contract not found',
+            ], 404);
+        }
+
+        $quotations = DomoprimeQuotation::where('contract_id', $contractId)
+            ->with(['products', 'calculation', 'subventionType', 'creator:id,firstname,lastname'])
+            ->orderByDesc('id')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                'quotations' => $quotations,
+                'pagination' => null,
+            ],
+        ]);
+    }
+
+    /**
+     * List all quotations for a meeting (via linked contract or directly).
+     */
+    public function listQuotationsForMeeting(Request $request, int $meetingId): JsonResponse
+    {
+        $meeting = \Modules\CustomersMeetings\Entities\CustomerMeeting::find($meetingId);
+
+        if (! $meeting) {
+            return response()->json(['success' => false, 'message' => 'Meeting not found'], 404);
+        }
+
+        // Story M0 added direct meeting_id quotations. We surface both:
+        // - quotations attached to the meeting itself
+        // - quotations attached to any contract derived from this meeting
+        $contractIds = CustomerContract::where('meeting_id', $meetingId)->pluck('id');
+
+        $quotations = DomoprimeQuotation::query()
+            ->where(function ($q) use ($meetingId, $contractIds) {
+                $q->where('meeting_id', $meetingId);
+                if ($contractIds->isNotEmpty()) {
+                    $q->orWhereIn('contract_id', $contractIds);
+                }
+            })
+            ->with(['products', 'calculation', 'subventionType', 'creator:id,firstname,lastname'])
+            ->orderByDesc('id')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'quotations' => $quotations,
+                'pagination' => null,
+            ],
+        ]);
+    }
+
+    /**
+     * Show a single quotation with products and items (for the edit form).
+     */
+    public function showQuotation(int $id): JsonResponse
+    {
+        $quotation = DomoprimeQuotation::with([
+            'products.items',
+            'calculation',
+            'subventionType',
+            'creator:id,firstname,lastname',
+        ])->findOrFail($id);
+
+        return response()->json([
+            'success' => true,
+            'data'    => $quotation,
+        ]);
+    }
+
+    /**
+     * Update a quotation (date, subvention type, product items quantities/prices).
+     * Matches Symfony SaveITEQuotation3FromRequestForViewContract action.
+     */
+    public function updateQuotation(Request $request, int $id): JsonResponse
+    {
+        $quotation = DomoprimeQuotation::with(['products.items'])->findOrFail($id);
+
+        $validated = $request->validate([
+            'dated_at'            => 'sometimes|date',
+            'subvention_type_id'  => 'sometimes|nullable|integer|exists:t_domoprime_subvention_type,id',
+            'discount_amount'     => 'sometimes|numeric|min:0|max:9999999.99',
+            'ana_prime'           => 'sometimes|numeric|min:0|max:9999999.99',
+            'prime'               => 'sometimes|numeric|min:0|max:9999999.99',
+            'items'               => 'sometimes|array',
+            'items.*.id'          => 'required_with:items|integer|min:1',
+            'items.*.quantity'    => 'sometimes|numeric|min:0|max:999999.999',
+            'items.*.sale_price_without_tax' => 'sometimes|numeric|min:0|max:9999999.99',
+        ]);
+
+        $allowedTopLevel = ['dated_at', 'subvention_type_id', 'discount_amount', 'ana_prime', 'prime'];
+        $updates = array_intersect_key($validated, array_flip($allowedTopLevel));
+
+        if (! empty($updates)) {
+            $quotation->update($updates);
+        }
+
+        // Update product items (quantities and prices)
+        foreach ($validated['items'] ?? [] as $itemData) {
+            $item = DomoprimeQuotationProductItem::find($itemData['id']);
+
+            if (! $item || $item->quotation_id !== $quotation->id) {
+                continue;
+            }
+
+            $itemUpdates = array_intersect_key(
+                $itemData,
+                array_flip(['quantity', 'sale_price_without_tax'])
+            );
+
+            if (! empty($itemUpdates)) {
+                $item->update($itemUpdates);
+            }
+        }
+
+        // Reload and return
+        $quotation->refresh();
+        $quotation->load(['products.items', 'calculation', 'subventionType', 'creator:id,firstname,lastname']);
+
+        return response()->json([
+            'success' => true,
+            'data'    => $quotation,
+            'message' => 'Quotation updated successfully',
+        ]);
+    }
+
+    /**
+     * Disable a quotation (set status to DELETE).
+     */
+    public function disableQuotation(int $id): JsonResponse
+    {
+        $quotation = DomoprimeQuotation::findOrFail($id);
+        $quotation->update(['status' => 'DELETE']);
+
+        return response()->json(['success' => true, 'message' => 'Quotation disabled']);
+    }
+
+    /**
+     * Enable a quotation (set status to ACTIVE).
+     */
+    public function enableQuotation(int $id): JsonResponse
+    {
+        $quotation = DomoprimeQuotation::findOrFail($id);
+        $quotation->update(['status' => 'ACTIVE']);
+
+        return response()->json(['success' => true, 'message' => 'Quotation enabled']);
+    }
+
+    /**
+     * Permanently delete a quotation and its related products/items.
+     */
+    public function destroyQuotation(int $id): JsonResponse
+    {
+        $quotation = DomoprimeQuotation::findOrFail($id);
+
+        // Delete related items first, then products, then quotation
+        $quotation->productItems()->delete();
+        $quotation->products()->delete();
+        $quotation->delete();
+
+        return response()->json(['success' => true, 'message' => 'Quotation deleted permanently']);
+    }
+
+    /**
+     * Refresh (regenerate) the quotation reference.
+     */
+    public function refreshQuotationReference(int $id): JsonResponse
+    {
+        $quotation = DomoprimeQuotation::findOrFail($id);
+
+        $newRef = 'DEV-' . str_pad($quotation->id, 6, '0', STR_PAD_LEFT)
+            . '-' . now()->format('mY');
+
+        $quotation->update(['reference' => $newRef]);
+
+        return response()->json([
+            'success'   => true,
+            'message'   => 'Reference refreshed',
+            'reference' => $newRef,
+        ]);
+    }
+
+    /**
+     * List subvention types (for the edit form dropdown).
+     */
+    public function listSubventionTypes(): JsonResponse
+    {
+        $types = DomoprimeSubventionType::orderBy('name')->get();
+
+        return response()->json([
+            'success' => true,
+            'data'    => $types,
         ]);
     }
 
