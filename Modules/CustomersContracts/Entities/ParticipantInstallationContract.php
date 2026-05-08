@@ -11,6 +11,10 @@ class ParticipantInstallationContract extends Model
     protected $connection = 'tenant';
     protected $table = 't_participants_installation_contract';
 
+    protected $fillable = [
+        'contract_id', 'installer_id', 'counter_at', 'type', 'linked_at', 'worked_at',
+    ];
+
     protected $casts = [
         'counter_at' => 'datetime',
         'linked_at' => 'datetime',

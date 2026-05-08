@@ -296,59 +296,40 @@ class Iso3DocumentController extends Controller
     {
         $quotation = DomoprimeQuotation::with(['products.items'])->findOrFail($id);
 
-        // Update quotation-level fields
-        $updates = [];
+        $validated = $request->validate([
+            'dated_at'            => 'sometimes|date',
+            'subvention_type_id'  => 'sometimes|nullable|integer|exists:t_domoprime_subvention_type,id',
+            'discount_amount'     => 'sometimes|numeric|min:0|max:9999999.99',
+            'ana_prime'           => 'sometimes|numeric|min:0|max:9999999.99',
+            'prime'               => 'sometimes|numeric|min:0|max:9999999.99',
+            'items'               => 'sometimes|array',
+            'items.*.id'          => 'required_with:items|integer|min:1',
+            'items.*.quantity'    => 'sometimes|numeric|min:0|max:999999.999',
+            'items.*.sale_price_without_tax' => 'sometimes|numeric|min:0|max:9999999.99',
+        ]);
 
-        if ($request->has('dated_at')) {
-            $updates['dated_at'] = $request->input('dated_at');
-        }
-
-        if ($request->has('subvention_type_id')) {
-            $updates['subvention_type_id'] = $request->input('subvention_type_id');
-        }
-
-        if ($request->has('discount_amount')) {
-            $updates['discount_amount'] = (float) $request->input('discount_amount', 0);
-        }
-
-        if ($request->has('ana_prime')) {
-            $updates['ana_prime'] = (float) $request->input('ana_prime', 0);
-        }
-
-        if ($request->has('prime')) {
-            $updates['prime'] = (float) $request->input('prime', 0);
-        }
+        $allowedTopLevel = ['dated_at', 'subvention_type_id', 'discount_amount', 'ana_prime', 'prime'];
+        $updates = array_intersect_key($validated, array_flip($allowedTopLevel));
 
         if (! empty($updates)) {
             $quotation->update($updates);
         }
 
         // Update product items (quantities and prices)
-        if ($request->has('items') && is_array($request->input('items'))) {
-            foreach ($request->input('items') as $itemData) {
-                if (! isset($itemData['id'])) {
-                    continue;
-                }
+        foreach ($validated['items'] ?? [] as $itemData) {
+            $item = DomoprimeQuotationProductItem::find($itemData['id']);
 
-                $item = DomoprimeQuotationProductItem::find($itemData['id']);
+            if (! $item || $item->quotation_id !== $quotation->id) {
+                continue;
+            }
 
-                if (! $item || $item->quotation_id !== $quotation->id) {
-                    continue;
-                }
+            $itemUpdates = array_intersect_key(
+                $itemData,
+                array_flip(['quantity', 'sale_price_without_tax'])
+            );
 
-                $itemUpdates = [];
-
-                if (isset($itemData['quantity'])) {
-                    $itemUpdates['quantity'] = (float) $itemData['quantity'];
-                }
-
-                if (isset($itemData['sale_price_without_tax'])) {
-                    $itemUpdates['sale_price_without_tax'] = (float) $itemData['sale_price_without_tax'];
-                }
-
-                if (! empty($itemUpdates)) {
-                    $item->update($itemUpdates);
-                }
+            if (! empty($itemUpdates)) {
+                $item->update($itemUpdates);
             }
         }
 

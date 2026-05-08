@@ -321,11 +321,9 @@ class MeetingActionController extends Controller
             return response()->json(['success' => false, 'message' => 'Customer has no phone number'], 422);
         }
 
-        $message = $request->input('message');
-
-        if (! $message) {
-            return response()->json(['success' => false, 'message' => 'Message is required'], 422);
-        }
+        $request->validate([
+            'message' => 'required|string|max:1600',
+        ]);
 
         return response()->json([
             'success' => false,
@@ -346,12 +344,10 @@ class MeetingActionController extends Controller
             return response()->json(['success' => false, 'message' => 'Customer has no email address'], 422);
         }
 
-        $subject = $request->input('subject');
-        $body = $request->input('body');
-
-        if (! $subject || ! $body) {
-            return response()->json(['success' => false, 'message' => 'Subject and body are required'], 422);
-        }
+        $request->validate([
+            'subject' => 'required|string|max:255',
+            'body'    => 'required|string|max:65000',
+        ]);
 
         return response()->json([
             'success' => false,
@@ -367,11 +363,10 @@ class MeetingActionController extends Controller
     {
         $meeting = $this->findOrFail($id);
 
-        $commentText = $request->input('comment');
-
-        if (! $commentText) {
-            return response()->json(['success' => false, 'message' => 'Comment is required'], 422);
-        }
+        $validated = $request->validate([
+            'comment' => 'required|string|max:5000',
+        ]);
+        $commentText = $validated['comment'];
 
         return DB::connection('tenant')->transaction(function () use ($meeting, $commentText, $request) {
             $comment = CustomerMeetingComment::create([

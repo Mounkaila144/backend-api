@@ -19,6 +19,12 @@ class CustomerEmailHistory extends Model
     protected $connection = 'tenant';
     protected $table = 't_customers_email_history';
 
+    protected $fillable = [
+        'email_id',
+        'user_id',
+        'user_application',
+    ];
+
     public function email(): BelongsTo
     {
         return $this->belongsTo(CustomerEmailSent::class, 'email_id');

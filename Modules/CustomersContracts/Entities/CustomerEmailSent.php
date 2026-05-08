@@ -22,6 +22,16 @@ class CustomerEmailSent extends Model
     protected $connection = 'tenant';
     protected $table = 't_customers_email_sent';
 
+    protected $fillable = [
+        'model_id',
+        'customer_id',
+        'email',
+        'subject',
+        'body',
+        'is_sent',
+        'sent_at',
+    ];
+
     public $timestamps = false;
 
     protected $casts = [

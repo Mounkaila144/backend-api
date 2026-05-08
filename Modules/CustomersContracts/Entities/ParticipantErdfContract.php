@@ -10,6 +10,10 @@ class ParticipantErdfContract extends Model
     protected $connection = 'tenant';
     protected $table = 't_participants_erdf_contract';
 
+    protected $fillable = [
+        'contract_id', 'status_id', 'opened_at', 'resend_at', 'remarks',
+    ];
+
     protected $casts = [
         'opened_at' => 'datetime',
         'resend_at' => 'datetime',

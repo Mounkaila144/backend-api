@@ -27,6 +27,16 @@ class ProductItem extends Model
 
     protected $table = 't_products_item';
 
+    protected $fillable = [
+        'tva_id', 'product_id', 'reference', 'description',
+        'sale_price', 'discount_price', 'multiple', 'purchasing_price',
+        'input1', 'input2', 'input3', 'input4', 'input5', 'input6', 'input7',
+        'picture', 'unit', 'thickness', 'mark', 'coefficient', 'icon',
+        'content', 'details', 'layer_process',
+        'is_default', 'is_multiple', 'linked_id', 'position',
+        'is_active', 'is_mandatory', 'status',
+    ];
+
     protected $casts = [
         'tva_id' => 'integer',
         'product_id' => 'integer',

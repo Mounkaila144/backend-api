@@ -10,6 +10,11 @@ class ParticipantErdfQuotation extends Model
     protected $connection = 'tenant';
     protected $table = 't_participants_erdf_quotation';
 
+    protected $fillable = [
+        'contract_id', 'opened_at', 'amount', 'received_at',
+        'check_at', 'check_amount', 'remarks',
+    ];
+
     protected $casts = [
         'opened_at' => 'datetime',
         'received_at' => 'datetime',

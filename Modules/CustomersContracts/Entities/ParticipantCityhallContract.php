@@ -10,6 +10,10 @@ class ParticipantCityhallContract extends Model
     protected $connection = 'tenant';
     protected $table = 't_participants_cityhall_contract';
 
+    protected $fillable = [
+        'contract_id', 'status_id', 'send_at', 'ack_at', 'state_at', 'resend_at', 'remarks',
+    ];
+
     protected $casts = [
         'send_at' => 'datetime',
         'ack_at' => 'datetime',

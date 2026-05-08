@@ -11,6 +11,11 @@ class ParticipantConsuelContract extends Model
     protected $connection = 'tenant';
     protected $table = 't_participants_consuel_contract';
 
+    protected $fillable = [
+        'contract_id', 'status_id', 'installer_id', 'send_at', 'conformity',
+        'modified_at', 'visited_at', 'revisited_at', 'remarks', 'work_before',
+    ];
+
     protected $casts = [
         'send_at' => 'datetime',
         'modified_at' => 'datetime',

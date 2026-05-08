@@ -13,6 +13,12 @@ class DocumentChecker extends Model
     protected $connection = 'tenant';
     protected $table = 't_customers_contracts_documents_checker';
 
+    protected $fillable = [
+        'name',
+        'is_active',
+        'status',
+    ];
+
     protected $casts = [
         'is_active' => 'boolean',
     ];

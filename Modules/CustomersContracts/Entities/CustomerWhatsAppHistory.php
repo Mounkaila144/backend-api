@@ -11,6 +11,12 @@ class CustomerWhatsAppHistory extends Model
     protected $connection = 'tenant';
     protected $table = 't_customers_whats_app_history';
 
+    protected $fillable = [
+        'whats_app_id',
+        'user_id',
+        'user_application',
+    ];
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');

@@ -3,12 +3,14 @@
 namespace Modules\Site\Http\Controllers\Superadmin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Middleware\PopulateCorsOrigins;
 use Modules\Site\Http\Resources\SiteResource;
 use Modules\Site\Http\Resources\SiteCollection;
 use Modules\Site\Http\Resources\SiteListResource;
 use Modules\Site\Repositories\SiteRepository;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 
@@ -126,6 +128,7 @@ class SiteController extends Controller
 
         try {
             $site = $this->siteRepository->create($validator->validated());
+            $this->flushCorsOriginsCache();
 
             return response()->json([
                 'success' => true,
@@ -192,6 +195,7 @@ class SiteController extends Controller
 
         try {
             $site = $this->siteRepository->update($site, $validator->validated());
+            $this->flushCorsOriginsCache();
 
             return response()->json([
                 'success' => true,
@@ -218,6 +222,7 @@ class SiteController extends Controller
 
         try {
             $this->siteRepository->delete($site, $deleteDatabase);
+            $this->flushCorsOriginsCache();
 
             return response()->json([
                 'success' => true,
@@ -356,6 +361,7 @@ class SiteController extends Controller
         try {
             \App\Models\Tenant::whereIn('site_id', $validated['site_ids'])
                 ->update([$field => $validated['available']]);
+            $this->flushCorsOriginsCache();
 
             return response()->json([
                 'success' => true,
@@ -368,5 +374,15 @@ class SiteController extends Controller
                 'message' => 'Failed to update availability',
             ], 500);
         }
+    }
+
+    /**
+     * Invalidate the CORS allowed-origins cache so PopulateCorsOrigins re-reads
+     * t_sites on the next request. Called after any mutation that changes
+     * site_host or site_available.
+     */
+    private function flushCorsOriginsCache(): void
+    {
+        Cache::forget(PopulateCorsOrigins::CACHE_KEY);
     }
 }

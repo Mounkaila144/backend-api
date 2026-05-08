@@ -19,6 +19,14 @@ class CustomerWhatsAppSent extends Model
     protected $connection = 'tenant';
     protected $table = 't_customers_whats_app_sent';
 
+    protected $fillable = [
+        'model_id',
+        'customer_id',
+        'mobile',
+        'message',
+        'send_at',
+    ];
+
     public $timestamps = false;
 
     protected $casts = [

@@ -97,13 +97,13 @@ class ContractTabsController extends Controller
 
     public function storeComment(Request $request, int $contractId): JsonResponse
     {
-        $request->validate(['comment' => 'required|string']);
+        $validated = $request->validate(['comment' => 'required|string|max:5000']);
 
         $comment = CustomerContractComment::create([
             'contract_id' => $contractId,
-            'comment' => $request->input('comment'),
+            'comment' => $validated['comment'],
             'status' => 'ACTIVE',
-            'signature' => md5($request->input('comment') . time()),
+            'signature' => md5($validated['comment'] . time()),
         ]);
 
         CustomerContractCommentHistory::create([
@@ -578,11 +578,19 @@ class ContractTabsController extends Controller
 
     public function docCheckUpload(Request $request, int $contractId): JsonResponse
     {
-        $checkerId = $request->input('checker_id');
-        $checkId = $request->input('check_id');
+        $allowedExt = ['doc', 'docx', 'png', 'jpg', 'jpeg', 'pdf', 'txt', 'zip', 'rar'];
+
+        $validated = $request->validate([
+            'checker_id' => 'required|integer|min:1',
+            'check_id'   => 'sometimes|nullable|integer|min:1',
+            'files'      => 'required|array|max:20',
+            'files.*'    => 'required|file|max:10240',
+        ]);
+
+        $checkerId = (int) $validated['checker_id'];
+        $checkId   = !empty($validated['check_id']) ? (int) $validated['check_id'] : null;
 
         if (!$checkId) {
-            // Create check record if not exists
             $check = \DB::connection('tenant')->table('t_customers_contracts_document_check')
                 ->where('contract_id', $contractId)
                 ->where('document_id', $checkerId)
@@ -593,37 +601,46 @@ class ContractTabsController extends Controller
                     ->insertGetId([
                         'contract_id' => $contractId,
                         'document_id' => $checkerId,
-                        'comment' => '',
-                        'status_id' => null,
-                        'is_loaded' => 'NO',
-                        'is_hold' => 'NO',
-                        'created_at' => now(),
+                        'comment'     => '',
+                        'status_id'   => null,
+                        'is_loaded'   => 'NO',
+                        'is_hold'     => 'NO',
+                        'created_at'  => now(),
                     ]);
             } else {
                 $checkId = $check->id;
             }
         }
 
-        $files = $request->file('files', []);
+        $files    = (array) $request->file('files', []);
         $uploaded = [];
 
-        foreach ((array) $files as $file) {
-            $ext = $file->getClientOriginalExtension();
-            $title = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+        foreach ($files as $file) {
+            $ext = strtolower($file->getClientOriginalExtension());
+            if (!in_array($ext, $allowedExt, true)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "File extension .{$ext} is not allowed",
+                ], 422);
+            }
+
+            $titleRaw     = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+            // Sluggified filename for storage — defeats path traversal / cross-OS issues.
+            $safeBase     = \Illuminate\Support\Str::slug($titleRaw) ?: 'file';
+            $safeFilename = substr($safeBase, 0, 100) . '.' . $ext;
 
             $id = \DB::connection('tenant')->table('t_customers_contracts_document_file_check')
                 ->insertGetId([
-                    'check_id' => $checkId,
+                    'check_id'    => $checkId,
                     'contract_id' => $contractId,
-                    'title' => $title,
-                    'file' => $file->getClientOriginalName(),
-                    'extension' => $ext,
-                    'status' => 'ACTIVE',
-                    'created_at' => now(),
-                    'updated_at' => now(),
+                    'title'       => mb_substr($titleRaw, 0, 200),
+                    'file'        => $safeFilename,
+                    'extension'   => $ext,
+                    'status'      => 'ACTIVE',
+                    'created_at'  => now(),
+                    'updated_at'  => now(),
                 ]);
 
-            // Store file via TenantStorageManager (S3 or local)
             try {
                 $tenant = tenant() ?? \App\Models\Tenant::first();
                 $storageManager = app(\Modules\Superadmin\Services\TenantStorageManager::class);
@@ -631,16 +648,19 @@ class ContractTabsController extends Controller
                     $tenant->site_id,
                     "admin/data/contracts/documents/check/{$id}",
                     file_get_contents($file->getRealPath()),
-                    $file->getClientOriginalName()
+                    $safeFilename
                 );
-            } catch (\Exception $e) {
-                // Fallback to local storage
+            } catch (\Throwable $e) {
+                \Log::warning('docCheck cloud upload failed, using local fallback', [
+                    'file_id' => $id,
+                    'error'   => $e->getMessage(),
+                ]);
                 $siteName = \DB::connection('tenant')->getDatabaseName();
-                $dir = "sites/{$siteName}/admin/data/contracts/documents/check/{$id}";
-                $file->storeAs($dir, $file->getClientOriginalName(), 'local');
+                $dir      = "sites/{$siteName}/admin/data/contracts/documents/check/{$id}";
+                $file->storeAs($dir, $safeFilename, 'local');
             }
 
-            $uploaded[] = ['id' => $id, 'title' => $title, 'extension' => $ext];
+            $uploaded[] = ['id' => $id, 'title' => $titleRaw, 'extension' => $ext];
         }
 
         return response()->json(['success' => true, 'files' => $uploaded, 'check_id' => $checkId]);
@@ -760,15 +780,25 @@ class ContractTabsController extends Controller
      */
     public function saveStep(Request $request, int $contractId, string $participant): JsonResponse
     {
-        $data = $request->input('data', []);
         $now = now();
 
         $tableMap = [
-            'erdf' => 't_participants_erdf_contract',
+            'erdf'           => 't_participants_erdf_contract',
             'erdf_quotation' => 't_participants_erdf_quotation',
-            'cityhall' => 't_participants_cityhall_contract',
-            'consuel' => 't_participants_consuel_contract',
-            'installation' => 't_participants_installation_contract',
+            'cityhall'       => 't_participants_cityhall_contract',
+            'consuel'        => 't_participants_consuel_contract',
+            'installation'   => 't_participants_installation_contract',
+        ];
+
+        // Per-participant whitelist of column names accepted from $data.
+        // Any other key is dropped, so client can't write to id/contract_id/created_at
+        // or any other column that should not be user-controlled.
+        $allowedFieldsByParticipant = [
+            'erdf'           => ['status_id', 'opened_at', 'resend_at', 'remarks'],
+            'erdf_quotation' => ['opened_at', 'amount', 'received_at', 'check_at', 'check_amount', 'remarks'],
+            'cityhall'       => ['status_id', 'send_at', 'ack_at', 'state_at', 'resend_at', 'remarks'],
+            'consuel'        => ['status_id', 'installer_id', 'send_at', 'conformity', 'modified_at', 'visited_at', 'revisited_at', 'remarks', 'work_before'],
+            'installation'   => ['installer_id', 'counter_at', 'type', 'linked_at', 'worked_at'],
         ];
 
         $table = $tableMap[$participant] ?? null;
@@ -776,10 +806,17 @@ class ContractTabsController extends Controller
             return response()->json(['success' => false, 'message' => 'Unknown participant type'], 400);
         }
 
-        // Remove null/empty date fields that would cause "0000-00-00" issues
+        $request->validate([
+            'data' => 'required|array',
+        ]);
+        $data = (array) $request->input('data', []);
+
+        $allowed = $allowedFieldsByParticipant[$participant];
+        $filtered = array_intersect_key($data, array_flip($allowed));
+
+        // Normalize empty *_at values to null (avoid '0000-00-00' in MySQL strict mode)
         $cleanData = [];
-        foreach ($data as $key => $value) {
-            if ($key === 'id') continue;
+        foreach ($filtered as $key => $value) {
             if (str_ends_with($key, '_at') && empty($value)) {
                 $cleanData[$key] = null;
             } else {
@@ -946,7 +983,17 @@ class ContractTabsController extends Controller
     public function saveAttributions(Request $request, int $contractId): JsonResponse
     {
         $contract = CustomerContract::on('tenant')->findOrFail($contractId);
-        $data = $request->input('attributions', []);
+
+        $request->validate([
+            'attributions'                          => 'required|array',
+            'attributions.team_id'                  => 'sometimes|nullable|integer|min:0',
+            'attributions.contributors'             => 'sometimes|array',
+            'attributions.contributors.*.user_id'        => 'sometimes|nullable|integer|min:0',
+            'attributions.contributors.*.team_id'        => 'sometimes|nullable|integer|min:0',
+            'attributions.contributors.*.attribution_id' => 'sometimes|nullable|integer|min:0',
+            'attributions.contributors.*.payment_at'     => 'sometimes|nullable|date',
+        ]);
+        $data = (array) $request->input('attributions', []);
 
         // Update team_id if provided
         if (isset($data['team_id'])) {

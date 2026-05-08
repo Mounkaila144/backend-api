@@ -214,7 +214,10 @@ class MeetingFormsController extends Controller
 
     public function saveForMeeting(Request $request, int $meetingId): JsonResponse
     {
-        $formValues = $request->input('values', []);
+        $request->validate([
+            'values' => 'required|array',
+        ]);
+        $formValues = (array) $request->input('values', []);
 
         $existing = \DB::connection('tenant')
             ->table('t_customers_meeting_forms')
@@ -266,7 +269,11 @@ class MeetingFormsController extends Controller
     public function saveForContract(Request $request, int $contractId): JsonResponse
     {
         $contract = CustomerContract::on('tenant')->findOrFail($contractId);
-        $formValues = $request->input('values', []);
+
+        $request->validate([
+            'values' => 'required|array',
+        ]);
+        $formValues = (array) $request->input('values', []);
 
         // Get active form name to store in the correct namespace
         $formDef = \DB::connection('tenant')
@@ -351,13 +358,15 @@ class MeetingFormsController extends Controller
 
     public function createFormTemplate(Request $request): JsonResponse
     {
-        $name = $request->input('name', '');
-        $value = $request->input('value', '');
-        $lang = $request->input('lang', 'fr');
+        $validated = $request->validate([
+            'name'  => 'required|string|max:255',
+            'value' => 'sometimes|nullable|string|max:255',
+            'lang'  => 'sometimes|string|size:2',
+        ]);
 
-        if (!$name) {
-            return response()->json(['success' => false, 'message' => 'Name is required'], 422);
-        }
+        $name  = $validated['name'];
+        $value = $validated['value'] ?? '';
+        $lang  = $validated['lang']  ?? 'fr';
 
         $formId = \DB::connection('tenant')->table('t_customers_meeting_form')->insertGetId([
             'name' => $name,
@@ -379,10 +388,17 @@ class MeetingFormsController extends Controller
 
     public function updateFormTemplate(Request $request, int $id): JsonResponse
     {
-        $name = $request->input('name');
-        $value = $request->input('value');
-        $lang = $request->input('lang', 'fr');
-        $isActive = $request->input('is_active');
+        $validated = $request->validate([
+            'name'      => 'sometimes|nullable|string|max:255',
+            'value'     => 'sometimes|nullable|string|max:255',
+            'lang'      => 'sometimes|string|size:2',
+            'is_active' => 'sometimes|in:Y,N,YES,NO',
+        ]);
+
+        $name     = $validated['name']      ?? null;
+        $value    = $validated['value']     ?? null;
+        $lang     = $validated['lang']      ?? 'fr';
+        $isActive = $validated['is_active'] ?? null;
 
         $updates = [];
         if ($name !== null) $updates['name'] = $name;
@@ -465,8 +481,22 @@ class MeetingFormsController extends Controller
 
     public function saveFormFields(Request $request, int $id): JsonResponse
     {
-        $fields = $request->input('fields', []);
-        $lang = $request->input('lang', 'fr');
+        $validated = $request->validate([
+            'fields'                  => 'required|array|max:200',
+            'fields.*.id'             => 'sometimes|nullable|integer|min:1',
+            'fields.*.name'           => 'sometimes|nullable|string|max:120',
+            'fields.*.label'          => 'sometimes|nullable|string|max:255',
+            'fields.*.type'           => 'sometimes|nullable|string|max:50',
+            'fields.*.widget'         => 'sometimes|nullable|string|max:50',
+            'fields.*.default'        => 'sometimes|nullable|string|max:1000',
+            'fields.*.is_visible'     => 'sometimes|in:YES,NO,Y,N',
+            'fields.*.is_exportable'  => 'sometimes|in:YES,NO,Y,N',
+            'fields.*.choices'        => 'sometimes|array',
+            'lang'                    => 'sometimes|string|size:2',
+        ]);
+
+        $fields = (array) $validated['fields'];
+        $lang   = $validated['lang'] ?? 'fr';
 
         foreach ($fields as $index => $fieldData) {
             $fieldId = $fieldData['id'] ?? null;

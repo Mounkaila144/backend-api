@@ -12,6 +12,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // Hydrate les origines CORS autorisées depuis t_sites (cache 5 min).
+        // DOIT être prepend pour s'exécuter avant HandleCors qui lit la config.
+        $middleware->prepend(\App\Http\Middleware\PopulateCorsOrigins::class);
+
         // Middleware global pour la détection automatique de la langue
         $middleware->append(\App\Http\Middleware\SetLocale::class);
 

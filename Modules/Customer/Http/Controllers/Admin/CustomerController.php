@@ -25,9 +25,18 @@ class CustomerController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $perPage = $request->input('per_page', 15);
-            $search = $request->input('search');
-            $status = $request->input('status', 'ACTIVE');
+            $validated = $request->validate([
+                'per_page'   => 'sometimes|integer|min:1|max:200',
+                'search'     => 'sometimes|nullable|string|max:255',
+                'status'     => 'sometimes|nullable|in:ACTIVE,DELETE,ALL',
+                // Whitelisted to defeat injection / info disclosure via ORDER BY.
+                'sort_by'    => 'sometimes|in:id,created_at,updated_at,company,firstname,lastname,email,phone,mobile,birthday',
+                'sort_order' => 'sometimes|in:asc,desc',
+            ]);
+
+            $perPage  = (int) ($validated['per_page'] ?? 15);
+            $search   = $validated['search'] ?? null;
+            $status   = $validated['status']  ?? 'ACTIVE';
 
             $query = Customer::query()
                 ->with(['union', 'addresses', 'primaryContact'])
@@ -39,13 +48,13 @@ class CustomerController extends Controller
             }
 
             // Apply status filter
-            if ($status) {
+            if ($status && $status !== 'ALL') {
                 $query->where('status', $status);
             }
 
-            // Apply sorting
-            $sortBy = $request->input('sort_by', 'created_at');
-            $sortOrder = $request->input('sort_order', 'desc');
+            // Apply sorting (validated whitelist above)
+            $sortBy    = $validated['sort_by']    ?? 'created_at';
+            $sortOrder = $validated['sort_order'] ?? 'desc';
             $query->orderBy($sortBy, $sortOrder);
 
             // Paginate results

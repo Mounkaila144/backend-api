@@ -20,6 +20,15 @@ class PartnerWhatsAppSent extends Model
     protected $connection = 'tenant';
     protected $table = 't_partners_whats_app_sent';
 
+    protected $fillable = [
+        'model_id',
+        'partner_id',
+        'contract_id',
+        'mobile',
+        'message',
+        'send_at',
+    ];
+
     public $timestamps = false;
 
     protected $casts = [

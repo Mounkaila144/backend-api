@@ -196,82 +196,91 @@ class MenuRepository
     }
 
     /**
-     * Move subtree forward in the tree
+     * Move subtree forward in the tree.
+     *
+     * Note: $width / $newPosition / $levelDiff are guaranteed int by signature, and
+     * $menu->lb / $menu->rb / $menu->level are cast to int in SystemMenu::$casts. The
+     * (int) casts below are defense-in-depth against future model/signature drift.
      */
     protected function moveSubtreeForward(SystemMenu $menu, int $newPosition, int $width, int $levelDiff): void
     {
-        $tmpLb = $menu->lb;
-        $tmpRb = $menu->rb;
+        $tmpLb = (int) $menu->lb;
+        $tmpRb = (int) $menu->rb;
+        $w     = (int) $width;
+        $ld    = (int) $levelDiff;
 
         // Step 1: Make negative to temporarily remove from tree
         SystemMenu::where('lb', '>=', $tmpLb)
             ->where('rb', '<=', $tmpRb)
             ->update([
-                'lb' => DB::raw("lb * -1"),
-                'rb' => DB::raw("rb * -1"),
-                'level' => DB::raw("level + {$levelDiff}")
+                'lb'    => DB::raw('lb * -1'),
+                'rb'    => DB::raw('rb * -1'),
+                'level' => DB::raw("level + {$ld}"),
             ]);
 
         // Step 2: Close the gap left by moved nodes
         SystemMenu::where('lb', '>', $tmpRb)
-            ->update(['lb' => DB::raw("lb - {$width}")]);
+            ->update(['lb' => DB::raw("lb - {$w}")]);
 
         SystemMenu::where('rb', '>', $tmpRb)
-            ->update(['rb' => DB::raw("rb - {$width}")]);
+            ->update(['rb' => DB::raw("rb - {$w}")]);
 
         // Step 3: Make space at new position
-        $adjustedPosition = $newPosition > $tmpLb ? $newPosition - $width : $newPosition;
+        $adjustedPosition = (int) ($newPosition > $tmpLb ? $newPosition - $w : $newPosition);
 
         SystemMenu::where('lb', '>=', $adjustedPosition)
             ->where('lb', '>', 0)
-            ->update(['lb' => DB::raw("lb + {$width}")]);
+            ->update(['lb' => DB::raw("lb + {$w}")]);
 
         SystemMenu::where('rb', '>=', $adjustedPosition)
             ->where('rb', '>', 0)
-            ->update(['rb' => DB::raw("rb + {$width}")]);
+            ->update(['rb' => DB::raw("rb + {$w}")]);
 
         // Step 4: Move nodes to new position (make positive again)
-        $offset = $adjustedPosition - $tmpLb;
+        $offset = (int) ($adjustedPosition - $tmpLb);
         SystemMenu::where('lb', '<', 0)
             ->update([
                 'lb' => DB::raw("(lb * -1) + {$offset}"),
-                'rb' => DB::raw("(rb * -1) + {$offset}")
+                'rb' => DB::raw("(rb * -1) + {$offset}"),
             ]);
     }
 
     /**
-     * Move subtree backward in the tree
+     * Move subtree backward in the tree. See note on moveSubtreeForward re: int casts.
      */
     protected function moveSubtreeBackward(SystemMenu $menu, int $newPosition, int $width, int $levelDiff): void
     {
-        $tmpLb = $menu->lb;
-        $tmpRb = $menu->rb;
+        $tmpLb = (int) $menu->lb;
+        $tmpRb = (int) $menu->rb;
+        $w     = (int) $width;
+        $ld    = (int) $levelDiff;
+        $np    = (int) $newPosition;
 
         // Step 1: Make space at new position first
-        SystemMenu::where('lb', '>=', $newPosition)
+        SystemMenu::where('lb', '>=', $np)
             ->where('lb', '<', $tmpLb)
-            ->update(['lb' => DB::raw("lb + {$width}")]);
+            ->update(['lb' => DB::raw("lb + {$w}")]);
 
-        SystemMenu::where('rb', '>=', $newPosition)
+        SystemMenu::where('rb', '>=', $np)
             ->where('rb', '<', $tmpLb)
-            ->update(['rb' => DB::raw("rb + {$width}")]);
+            ->update(['rb' => DB::raw("rb + {$w}")]);
 
         // Step 2: Move subtree to new position
-        $offset = $newPosition - $tmpLb;
+        $offset = (int) ($np - $tmpLb);
         SystemMenu::where('lb', '>=', $tmpLb)
             ->where('rb', '<=', $tmpRb)
             ->update([
-                'lb' => DB::raw("lb + {$offset}"),
-                'rb' => DB::raw("rb + {$offset}"),
-                'level' => DB::raw("level + {$levelDiff}")
+                'lb'    => DB::raw("lb + {$offset}"),
+                'rb'    => DB::raw("rb + {$offset}"),
+                'level' => DB::raw("level + {$ld}"),
             ]);
 
         // Step 3: Close the gap
         SystemMenu::where('lb', '>', $tmpRb + $offset)
-            ->update(['lb' => DB::raw("lb - {$width}")]);
+            ->update(['lb' => DB::raw("lb - {$w}")]);
 
         SystemMenu::where('rb', '>', $tmpRb + $offset)
-            ->update(['rb' => DB::raw("rb - {$width}")]);
+            ->update(['rb' => DB::raw("rb - {$w}")]);
     }
 
     /**
@@ -332,7 +341,7 @@ class MenuRepository
         return DB::transaction(function () use ($menuId) {
             $menu = SystemMenu::findOrFail($menuId);
 
-            $width = $menu->rb - $menu->lb + 1;
+            $width = (int) ($menu->rb - $menu->lb + 1);
 
             // Delete menu and descendants
             SystemMenu::where('lb', '>=', $menu->lb)
