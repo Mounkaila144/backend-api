@@ -9,7 +9,7 @@ use Modules\CustomersMeetings\Http\Controllers\Superadmin\IndexController;
 |--------------------------------------------------------------------------
 */
 
-Route::prefix('api/superadmin')->middleware(['auth:sanctum'])->group(function () {
+Route::prefix('api/superadmin')->middleware(['api', 'auth:sanctum'])->group(function () {
     Route::prefix('customersmeetings')->name('superadmin.customersmeetings.')->group(function () {
         Route::get('/', [IndexController::class, 'index'])->name('index');
         Route::post('/', [IndexController::class, 'store'])->name('store');

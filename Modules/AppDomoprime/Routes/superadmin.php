@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
-Route::prefix('api/superadmin')->middleware(['auth:sanctum'])->group(function () {
+Route::prefix('api/superadmin')->middleware(['api', 'auth:sanctum'])->group(function () {
     Route::prefix('appdomoprime')->name('superadmin.appdomoprime.')->group(function () {
         // Routes will be added here as controllers are created
     });

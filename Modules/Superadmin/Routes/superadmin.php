@@ -14,7 +14,7 @@ use Modules\Superadmin\Http\Controllers\Superadmin\HealthController;
 | Aucun middleware tenant - uniquement authentification Sanctum
 */
 
-Route::prefix('api/superadmin')->middleware(['auth:sanctum'])->group(function () {
+Route::prefix('api/superadmin')->middleware(['api', 'auth:sanctum'])->group(function () {
     // Liste des modules disponibles
     Route::get('modules', [ModuleController::class, 'index'])
         ->name('superadmin.modules.index');

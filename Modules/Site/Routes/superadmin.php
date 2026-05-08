@@ -10,7 +10,8 @@ use Modules\Site\Http\Controllers\Superadmin\SiteController;
 | Ces routes utilisent la base de données centrale
 */
 
-Route::prefix('api/superadmin')->middleware(['auth:sanctum'])->group(function () {
+// 'api' middleware brings Sanctum's stateful pipeline (session + CSRF) for SPA frontends.
+Route::prefix('api/superadmin')->middleware(['api', 'auth:sanctum'])->group(function () {
     Route::prefix('sites')->name('superadmin.sites.')->group(function () {
         // Statistiques (avant les routes avec paramètre)
         Route::get('statistics', [SiteController::class, 'statistics'])->name('statistics');
