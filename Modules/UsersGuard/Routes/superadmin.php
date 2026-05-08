@@ -11,19 +11,20 @@ use Modules\UsersGuard\Http\Controllers\Superadmin\AuthController;
 */
 
 // Routes d'authentification (pas de middleware auth)
-Route::prefix('api/superadmin')->group(function () {
+// 'api' middleware group brings EnsureFrontendRequestsAreStateful for SPA session/CSRF.
+Route::prefix('api/superadmin')->middleware(['api'])->group(function () {
     Route::prefix('auth')->group(function () {
         Route::post('login', [AuthController::class, 'login']);
     });
 });
 
 // Routes protégées
-Route::prefix('api/superadmin')->middleware(['auth:sanctum'])->group(function () {
+Route::prefix('api/superadmin')->middleware(['api', 'auth:sanctum'])->group(function () {
     // Auth routes (protégées)
     Route::prefix('auth')->group(function () {
         Route::get('me', [AuthController::class, 'me']);
         Route::post('logout', [AuthController::class, 'logout']);
-        Route::post('refresh', [AuthController::class, 'refresh']);
+        // /auth/refresh removed — Sanctum SPA sessions auto-extend on activity (config/session.php).
     });
 
     // Users guard routes

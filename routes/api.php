@@ -22,6 +22,14 @@ Route::get('/health', function () {
     ]);
 });
 
+// Mirror of Sanctum's /sanctum/csrf-cookie inside the /api/* path so it survives any
+// frontend redirect rule that otherwise rewrites root paths (e.g. Next.js locale
+// catch-all). The api group's EnsureFrontendRequestsAreStateful adds StartSession +
+// AddQueuedCookiesToResponse which is what actually sets the XSRF-TOKEN cookie.
+Route::get('/csrf-cookie', function () {
+    return response()->noContent();
+})->name('api.csrf-cookie');
+
 // Permission routes (requires authentication)
 Route::middleware(['auth:sanctum', 'tenant'])->prefix('api/auth')->group(function () {
     Route::get('/permissions', [PermissionController::class, 'index'])->name('api.permissions.index');

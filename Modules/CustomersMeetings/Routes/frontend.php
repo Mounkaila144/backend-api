@@ -9,7 +9,7 @@ use Modules\CustomersMeetings\Http\Controllers\Frontend\IndexController;
 |--------------------------------------------------------------------------
 */
 
-Route::prefix('api/frontend')->middleware(['tenant'])->group(function () {
+Route::prefix('api/frontend')->middleware(['api', 'tenant'])->group(function () {
     Route::prefix('customersmeetings')->name('frontend.customersmeetings.')->group(function () {
         // Public routes
         Route::get('/', [IndexController::class, 'index'])->name('index');

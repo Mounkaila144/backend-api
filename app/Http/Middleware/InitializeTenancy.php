@@ -6,7 +6,6 @@ namespace App\Http\Middleware;
 use App\Models\Tenant;
 use Closure;
 use Illuminate\Http\Request;
-use Laravel\Sanctum\PersonalAccessToken;
 use Symfony\Component\HttpFoundation\Response;
 
 class InitializeTenancy
@@ -45,15 +44,13 @@ class InitializeTenancy
 
         // SÉCURITÉ — empêche le pivot cross-tenant.
         //
-        // Si la requête porte un Bearer Sanctum, le token DOIT correspondre au tenant
-        // résolu ci-dessus, sinon n'importe quel utilisateur authentifié pourrait
-        // changer le header X-Tenant-ID et opérer sur les données d'un autre site.
+        // Si une session SPA est établie (admin guard) elle a stocké le site_id du tenant
+        // sur lequel l'utilisateur s'est authentifié (cf. AuthController::login). On rejette
+        // toute requête où le tenant résolu ci-dessus diffère.
         //
-        // Conventions d'abilities (posées au login dans AuthController) :
-        //   - role:superadmin       → bypass tenant (peut traverser plusieurs sites)
-        //   - tenant:<site_id>      → token lié strictement à ce site
-        //   - autre / aucun         → token legacy, refusé (forcer re-login)
-        if ($mismatch = $this->detectTokenTenantMismatch($request, (int) $tenant->site_id)) {
+        // Bearer tokens (legacy / mobile): l'ability `tenant:<site_id>` est vérifiée à la place.
+        // Les tokens superadmin (`role:superadmin`) traversent les tenants → bypass.
+        if ($mismatch = $this->detectTenantBindingMismatch($request, (int) $tenant->site_id)) {
             return $mismatch;
         }
 
@@ -74,32 +71,48 @@ class InitializeTenancy
     }
 
     /**
-     * Returns a 403 JsonResponse if the bearer token does not belong to $tenantId.
-     * Returns null if the binding is OK or no bearer token is present.
+     * Returns a 403 JsonResponse if the authenticated principal does not belong to $tenantId.
+     * Returns null if there's no authentication context or if the binding matches.
      */
-    private function detectTokenTenantMismatch(Request $request, int $tenantId): ?Response
+    private function detectTenantBindingMismatch(Request $request, int $tenantId): ?Response
     {
+        // 1) Session-based binding (Sanctum SPA — primary path).
+        //    AuthController::login stores tenant_site_id at login time.
+        if ($request->hasSession() && $request->session()->has('tenant_site_id')) {
+            $sessionTenantId = (int) $request->session()->get('tenant_site_id');
+
+            if ($sessionTenantId === $tenantId) {
+                return null;
+            }
+
+            return response()->json([
+                'success' => false,
+                'error'   => 'Session does not belong to this tenant',
+                'hint'    => 'Please re-authenticate against the correct tenant',
+            ], 403);
+        }
+
+        // 2) Bearer token binding (legacy / non-SPA clients).
+        //    Token must carry ability tenant:<site_id> (set by AuthController on PAT issuance).
         $bearer = $request->bearerToken();
         if (!$bearer) {
-            // Pas de token — l'éventuel auth:sanctum refusera plus tard pour les routes protégées.
+            // Pas d'auth du tout — auth:sanctum / auth:admin refusera plus tard pour les routes protégées.
             return null;
         }
 
         try {
-            $accessToken = PersonalAccessToken::findToken($bearer);
+            $accessToken = \Laravel\Sanctum\PersonalAccessToken::findToken($bearer);
         } catch (\Throwable $e) {
-            // Lookup échoué (DB indisponible) — laisse auth:sanctum gérer.
             return null;
         }
 
         if ($accessToken === null) {
-            // Token invalide → auth:sanctum renverra 401 plus loin.
             return null;
         }
 
         $abilities = (array) ($accessToken->abilities ?? []);
 
-        // Superadmin : autorisé à traverser les tenants.
+        // Superadmin tokens are allowed to traverse tenants.
         if (in_array('role:superadmin', $abilities, true)) {
             return null;
         }

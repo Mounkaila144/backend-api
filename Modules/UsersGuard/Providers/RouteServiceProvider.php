@@ -37,6 +37,8 @@ class RouteServiceProvider extends ServiceProvider
      */
     protected function mapApiRoutes(): void
     {
+        // ->middleware('api') is required so the api group's EnsureFrontendRequestsAreStateful
+        // runs and enables session/CSRF for stateful frontend requests (Sanctum SPA mode).
         Route::prefix('api')
             ->namespace($this->moduleNamespace)
             ->group(module_path('UsersGuard', '/Routes/admin.php'));

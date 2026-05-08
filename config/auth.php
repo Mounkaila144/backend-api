@@ -36,9 +36,24 @@ return [
     */
 
     'guards' => [
+        // Default Laravel guard, kept for compatibility (used by the central User model).
         'web' => [
             'driver' => 'session',
             'provider' => 'users',
+        ],
+
+        // Tenant users (admin + frontend layers). Resolves Modules\UsersGuard\Entities\User
+        // on the tenant DB connection. The tenant connection MUST be initialized BEFORE
+        // this guard tries to resolve a user — InitializeTenancy ensures that on tenant routes.
+        'admin' => [
+            'driver' => 'session',
+            'provider' => 'tenant_users',
+        ],
+
+        // Central / superadmin users.
+        'superadmin' => [
+            'driver' => 'session',
+            'provider' => 'central_users',
         ],
     ],
 
@@ -60,15 +75,25 @@ return [
     */
 
     'providers' => [
+        // Default Laravel provider (kept). Points to the central User model.
         'users' => [
             'driver' => 'eloquent',
             'model' => env('AUTH_MODEL', App\Models\User::class),
         ],
 
-        // 'users' => [
-        //     'driver' => 'database',
-        //     'table' => 'users',
-        // ],
+        // Tenant users — Modules\UsersGuard\Entities\User uses the 'tenant' connection.
+        // Resolution requires the tenant connection to be initialized first
+        // (see App\Http\Middleware\InitializeTenancy).
+        'tenant_users' => [
+            'driver' => 'eloquent',
+            'model'  => Modules\UsersGuard\Entities\User::class,
+        ],
+
+        // Central / superadmin users.
+        'central_users' => [
+            'driver' => 'eloquent',
+            'model'  => App\Models\User::class,
+        ],
     ],
 
     /*

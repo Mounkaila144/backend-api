@@ -30,11 +30,7 @@ class PopulateCorsOrigins
 
     public function handle(Request $request, Closure $next): Response
     {
-        $tenantOrigins = Cache::remember(
-            self::CACHE_KEY,
-            self::CACHE_TTL_SECONDS,
-            fn () => $this->loadTenantOrigins()
-        );
+        $tenantOrigins = $this->resolveTenantOrigins();
 
         $existing = (array) config('cors.allowed_origins', []);
         $merged   = array_values(array_unique(array_merge($existing, $tenantOrigins)));
@@ -42,6 +38,25 @@ class PopulateCorsOrigins
         config(['cors.allowed_origins' => $merged]);
 
         return $next($request);
+    }
+
+    /**
+     * Cache::remember + DB read, with a graceful degradation path: if either the cache
+     * driver or the central DB is unreachable, fall back to the static config rather
+     * than 500-ing every request.
+     */
+    private function resolveTenantOrigins(): array
+    {
+        try {
+            return Cache::remember(
+                self::CACHE_KEY,
+                self::CACHE_TTL_SECONDS,
+                fn () => $this->loadTenantOrigins()
+            );
+        } catch (\Throwable $e) {
+            // Cache backend down — try the DB lookup directly without caching.
+            return $this->loadTenantOrigins();
+        }
     }
 
     /**

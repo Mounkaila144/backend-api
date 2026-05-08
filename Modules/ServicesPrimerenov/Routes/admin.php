@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Route;
 |  - ajaxTest                  → test API credentials
 */
 
-Route::prefix('api/admin')->middleware(['tenant', 'auth:sanctum'])->group(function () {
+Route::prefix('api/admin')->middleware(['api', 'tenant', 'auth:sanctum'])->group(function () {
     Route::prefix('services-primerenov')->name('admin.servicesprimerenov.')->group(function () {
         // TODO: Implement endpoints as needed
         // Route::get('/requests', [RequestController::class, 'index'])->name('requests.index');

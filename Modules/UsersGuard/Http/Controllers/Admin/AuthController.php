@@ -3,51 +3,57 @@
 namespace Modules\UsersGuard\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\User as SuperadminUser;
-use Modules\UsersGuard\Entities\User as TenantUser;
-use App\Models\Tenant;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use Modules\UsersGuard\Entities\User as TenantUser;
 
 class AuthController extends Controller
 {
     /**
-     * Vérifier le mot de passe (supporte MD5 legacy et bcrypt)
+     * Vérifie le mot de passe (supporte MD5 legacy ET bcrypt).
+     * Auth::attempt n'est pas utilisable ici parce qu'il appelle Hash::check
+     * qui rejette les hash MD5 hérités du Symfony 1.
      */
     private function checkPassword(string $plainPassword, string $hashedPassword): bool
     {
-        // Si le hash fait 60 caractères, c'est bcrypt
         if (strlen($hashedPassword) === 60) {
             return Hash::check($plainPassword, $hashedPassword);
         }
 
-        // Si le hash fait 32 caractères, c'est MD5 (legacy)
         if (strlen($hashedPassword) === 32) {
             return md5($plainPassword) === $hashedPassword;
         }
 
-        // Format inconnu
         return false;
     }
 
     /**
-     * Login TENANT (base du site)
-     * POST /api/auth/login
-     * Header requis: X-Tenant-ID
+     * Login TENANT (Sanctum SPA — session cookie).
+     * POST /api/admin/auth/login
+     * Header requis : X-Tenant-ID (consommé par InitializeTenancy)
+     *
+     * Le frontend doit avoir appelé GET /sanctum/csrf-cookie avant pour récupérer
+     * le cookie XSRF-TOKEN qu'il renvoie en X-XSRF-TOKEN sur ce POST.
      */
     public function login(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'username' => 'required|string',
-            'password' => 'required|string',
+            'username'    => 'required|string',
+            'password'    => 'required|string',
             'application' => 'required|in:admin,frontend',
         ]);
 
-        // Le middleware 'tenant' a déjà initialisé la connexion
-        // On cherche donc dans la base TENANT
+        $tenant = tenancy()->tenant;
+        if (!$tenant) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tenant context not initialized',
+            ], 500);
+        }
 
         $user = TenantUser::where('username', $validated['username'])
             ->where('application', $validated['application'])
@@ -60,16 +66,20 @@ class AuthController extends Controller
             ]);
         }
 
-        // Créer token avec le tenant_id
-        $token = $user->createToken('tenant-token', [
-            'role:' . $validated['application'],
-            'tenant:' . tenancy()->tenant->site_id,
-        ])->plainTextToken;
+        // Établir la session SPA. Si une session superadmin coexiste dans le navigateur,
+        // on la révoque pour éviter qu'un seul cookie débouche sur deux identités.
+        Auth::guard('superadmin')->logout();
+        Auth::guard('admin')->login($user);
 
-        // Charger les relations
+        // Rotation de l'ID de session pour parer le session fixation.
+        $request->session()->regenerate();
+
+        // Stocker le binding tenant côté session — vérifié à chaque requête par
+        // InitializeTenancy::detectTenantBindingMismatch.
+        $request->session()->put('tenant_site_id', (int) $tenant->site_id);
+
         $user->load(['groups.permissions', 'permissions']);
 
-        // Mettre à jour last login
         DB::connection('tenant')->table('t_users')
             ->where('id', $user->id)
             ->update(['lastlogin' => now()]);
@@ -79,48 +89,51 @@ class AuthController extends Controller
             'message' => __('User login successfully'),
             'data' => [
                 'user' => [
-                    'id' => $user->id,
-                    'username' => $user->username,
-                    'email' => $user->email,
-                    'firstname' => $user->firstname,
-                    'lastname' => $user->lastname,
+                    'id'          => $user->id,
+                    'username'    => $user->username,
+                    'email'       => $user->email,
+                    'firstname'   => $user->firstname,
+                    'lastname'    => $user->lastname,
                     'application' => $user->application,
-                    'groups' => $user->groups,
+                    'groups'      => $user->groups,
                     'permissions' => $user->permissions,
                 ],
-                'token' => $token,
-                'token_type' => 'Bearer',
                 'tenant' => [
-                    'id' => tenancy()->tenant->site_id,
-                    'host' => tenancy()->tenant->site_host,
-                    'database' => tenancy()->tenant->site_db_name,
+                    'id'       => $tenant->site_id,
+                    'host'     => $tenant->site_host,
+                    'database' => $tenant->site_db_name,
                 ],
             ],
         ]);
     }
 
     /**
-     * Get current user (superadmin ou tenant)
-     * GET /api/auth/me
+     * Renvoie l'utilisateur courant (admin ou superadmin selon la session active).
+     * GET /api/admin/auth/me
      */
     public function me(Request $request): JsonResponse
     {
-        $user = $request->user();
+        $user = Auth::guard('admin')->user() ?? Auth::guard('superadmin')->user();
 
-        // Déterminer si c'est un superadmin ou tenant user
-        $isSuperadmin = $user->application === 'superadmin';
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthenticated',
+            ], 401);
+        }
 
-        if (!$isSuperadmin && tenancy()->initialized) {
-            // User tenant : charger les relations
+        $isSuperadmin = ($user->application ?? null) === 'superadmin';
+
+        if (!$isSuperadmin && method_exists($user, 'load')) {
             $user->load(['groups.permissions', 'permissions']);
         }
 
         return response()->json([
             'success' => true,
             'data' => [
-                'user' => $user,
+                'user'   => $user,
                 'tenant' => $isSuperadmin ? null : [
-                    'id' => tenancy()->tenant?->site_id,
+                    'id'   => tenancy()->tenant?->site_id,
                     'host' => tenancy()->tenant?->site_host,
                 ],
             ],
@@ -128,50 +141,18 @@ class AuthController extends Controller
     }
 
     /**
-     * Logout
-     * POST /api/auth/logout
+     * Logout — détruit la session.
+     * POST /api/admin/auth/logout
      */
     public function logout(Request $request): JsonResponse
     {
-        $request->user()->currentAccessToken()->delete();
+        Auth::guard('admin')->logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
 
         return response()->json([
             'success' => true,
             'message' => 'Logout successful',
-        ]);
-    }
-
-    /**
-     * Refresh token
-     * POST /api/auth/refresh
-     */
-    public function refresh(Request $request): JsonResponse
-    {
-        $user = $request->user();
-
-        // Déterminer les abilities
-        $abilities = [];
-        if ($user->application === 'superadmin') {
-            $abilities = ['role:superadmin'];
-        } else {
-            $abilities = [
-                'role:' . $user->application,
-                'tenant:' . tenancy()->tenant?->site_id,
-            ];
-        }
-
-        // Révoquer l'ancien token
-        $request->user()->currentAccessToken()->delete();
-
-        // Créer nouveau token
-        $token = $user->createToken('refreshed-token', $abilities)->plainTextToken;
-
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'token' => $token,
-                'token_type' => 'Bearer',
-            ],
         ]);
     }
 }

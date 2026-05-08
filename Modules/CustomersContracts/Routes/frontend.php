@@ -10,7 +10,7 @@ use Modules\CustomersContracts\Http\Controllers\Frontend\IndexController;
 | Ces routes utilisent la base de données du tenant
 */
 
-Route::prefix('api/frontend')->middleware(['tenant'])->group(function () {
+Route::prefix('api/frontend')->middleware(['api', 'tenant'])->group(function () {
     Route::prefix('customerscontracts')->name('frontend.customerscontracts.')->group(function () {
         // Public routes
         Route::get('/', [IndexController::class, 'index'])->name('index');

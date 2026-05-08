@@ -15,7 +15,7 @@ use Modules\AppDomoprimeYousignEvidence\Http\Controllers\Admin\YousignEvidenceSe
 | Middleware: tenant + auth:sanctum.
 */
 
-Route::prefix('api/admin')->middleware(['tenant', 'auth:sanctum'])->group(function () {
+Route::prefix('api/admin')->middleware(['api', 'tenant', 'auth:sanctum'])->group(function () {
     Route::prefix('appdomoprime-yousign-evidence')->name('admin.yousign-evidence.')->group(function () {
 
         // ---- Phase A — Read-only signature status ----

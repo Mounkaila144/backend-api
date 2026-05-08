@@ -10,7 +10,7 @@ use Modules\Dashboard\Http\Controllers\Frontend\IndexController;
 | Ces routes utilisent la base de donnÃ©es du tenant
 */
 
-Route::prefix('api/frontend')->middleware(['tenant'])->group(function () {
+Route::prefix('api/frontend')->middleware(['api', 'tenant'])->group(function () {
     Route::prefix('dashboard')->name('frontend.dashboard.')->group(function () {
         // Public routes
         Route::get('/', [IndexController::class, 'index'])->name('index');

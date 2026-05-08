@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 */
 
-Route::prefix('api/frontend')->middleware(['tenant'])->group(function () {
+Route::prefix('api/frontend')->middleware(['api', 'tenant'])->group(function () {
     Route::prefix('appdomoprime')->name('frontend.appdomoprime.')->group(function () {
         // Routes will be added here as controllers are created
     });
