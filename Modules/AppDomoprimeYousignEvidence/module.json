@@ -1,0 +1,11 @@
+{
+    "name": "AppDomoprimeYousignEvidence",
+    "alias": "appdomoprimeyousignevidence",
+    "description": "Yousign Evidence electronic signature integration (devis, factures, documents société) — port of Symfony app_domoprime_yousign_evidence",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\AppDomoprimeYousignEvidence\\Providers\\AppDomoprimeYousignEvidenceServiceProvider"
+    ],
+    "files": []
+}

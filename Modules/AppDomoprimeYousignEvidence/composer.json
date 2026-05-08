@@ -1,0 +1,28 @@
+{
+    "name": "nwidart/app-domoprime-yousign-evidence",
+    "description": "Yousign Evidence electronic signature integration",
+    "authors": [
+        {
+            "name": "icall26",
+            "email": "dev@icall26.com"
+        }
+    ],
+    "extra": {
+        "laravel": {
+            "providers": [],
+            "aliases": {}
+        }
+    },
+    "autoload": {
+        "psr-4": {
+            "Modules\\AppDomoprimeYousignEvidence\\": "app",
+            "Modules\\AppDomoprimeYousignEvidence\\Database\\Factories\\": "database/factories/",
+            "Modules\\AppDomoprimeYousignEvidence\\Database\\Seeders\\": "database/seeders/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Modules\\AppDomoprimeYousignEvidence\\Tests\\": "tests/"
+        }
+    }
+}

@@ -187,11 +187,20 @@ class Iso3ResultsController extends Controller
 
             $cumac = null;
             if ($productCalculations->isNotEmpty() && empty($cumacErrors)) {
+                $totalCumac = (float) $productCalculations
+                    ->where('surface', '>', 0)
+                    ->sum('qmac_value');
+                $polluterUnitPrice = $polluterPricing ? (float) $polluterPricing->price : 0.0;
+
                 $cumac = [
                     'prices' => $productCalculations->map(fn (array $pc) => [
                         'qmac' => $pc['surface'] > 0 ? $pc['qmac_value'] : null,
                         'has_surface' => $pc['surface'] > 0,
+                        'product_id' => $pc['product_id'],
                     ]),
+                    'total' => round($totalCumac, 3),
+                    'polluter_unit_price' => $polluterUnitPrice,
+                    'prime_cee' => round($totalCumac * $polluterUnitPrice, 2),
                     'is_ana_available' => $isAnaAvailable,
                 ];
             }

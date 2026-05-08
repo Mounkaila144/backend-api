@@ -1,16 +1,15 @@
 <?php
 
-namespace Modules\CustomersMeetings\Providers;
+namespace Modules\AppDomoprimeYousignEvidence\Providers;
 
-use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Config;
-use Modules\CustomersMeetings\Console\SeedMeetingCredentialsCommand;
+use Illuminate\Support\ServiceProvider;
 
-class CustomersMeetingsServiceProvider extends ServiceProvider
+class AppDomoprimeYousignEvidenceServiceProvider extends ServiceProvider
 {
-    protected $moduleName = 'CustomersMeetings';
+    protected $moduleName = 'AppDomoprimeYousignEvidence';
 
-    protected $moduleNameLower = 'customersmeetings';
+    protected $moduleNameLower = 'appdomoprimeyousignevidence';
 
     public function boot(): void
     {
@@ -19,12 +18,6 @@ class CustomersMeetingsServiceProvider extends ServiceProvider
         $this->registerViews();
         $this->loadMigrationsFrom(module_path($this->moduleName, 'Database/migrations'));
         $this->registerRoutes();
-
-        if ($this->app->runningInConsole()) {
-            $this->commands([
-                SeedMeetingCredentialsCommand::class,
-            ]);
-        }
     }
 
     public function register(): void
@@ -50,7 +43,7 @@ class CustomersMeetingsServiceProvider extends ServiceProvider
         $sourcePath = module_path($this->moduleName, 'Resources/views');
 
         $this->publishes([
-            $sourcePath => $viewPath
+            $sourcePath => $viewPath,
         ], ['views', $this->moduleNameLower . '-module-views']);
 
         $this->loadViewsFrom(array_merge($this->getPublishableViewPaths(), [$sourcePath]), $this->moduleNameLower);
@@ -77,20 +70,8 @@ class CustomersMeetingsServiceProvider extends ServiceProvider
             $this->loadRoutesFrom($modulePath . '/Routes/admin.php');
         }
 
-        if (file_exists($modulePath . '/Routes/superadmin.php')) {
-            $this->loadRoutesFrom($modulePath . '/Routes/superadmin.php');
-        }
-
-        if (file_exists($modulePath . '/Routes/frontend.php')) {
-            $this->loadRoutesFrom($modulePath . '/Routes/frontend.php');
-        }
-
         if (file_exists($modulePath . '/Routes/api.php')) {
             $this->loadRoutesFrom($modulePath . '/Routes/api.php');
-        }
-
-        if (file_exists($modulePath . '/Routes/web.php')) {
-            $this->loadRoutesFrom($modulePath . '/Routes/web.php');
         }
     }
 
@@ -102,11 +83,13 @@ class CustomersMeetingsServiceProvider extends ServiceProvider
     private function getPublishableViewPaths(): array
     {
         $paths = [];
+
         foreach (Config::get('view.paths') as $path) {
             if (is_dir($path . '/modules/' . $this->moduleNameLower)) {
                 $paths[] = $path . '/modules/' . $this->moduleNameLower;
             }
         }
+
         return $paths;
     }
 }

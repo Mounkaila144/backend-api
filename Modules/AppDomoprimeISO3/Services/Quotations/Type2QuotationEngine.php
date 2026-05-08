@@ -3,6 +3,7 @@
 namespace Modules\AppDomoprimeISO3\Services\Quotations;
 
 use Modules\CustomersContracts\Entities\CustomerContract;
+use Modules\CustomersMeetings\Entities\CustomerMeeting;
 
 class Type2QuotationEngine extends AbstractQuotationEngine
 {
@@ -18,7 +19,7 @@ class Type2QuotationEngine extends AbstractQuotationEngine
     /**
      * @param  array<int, array<string, mixed>>  $items
      */
-    protected function computeCumac(CustomerContract $contract, array $items): float
+    protected function computeCumac(CustomerContract|CustomerMeeting $parent, array $items): float
     {
         return 0.0;
     }

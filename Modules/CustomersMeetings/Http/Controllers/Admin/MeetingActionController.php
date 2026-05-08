@@ -9,8 +9,10 @@ use Illuminate\Support\Facades\DB;
 use Modules\CustomersMeetings\Entities\CustomerMeeting;
 use Modules\CustomersMeetings\Entities\CustomerMeetingComment;
 use Modules\CustomersMeetings\Entities\CustomerMeetingHistory;
+use Modules\CustomersContracts\Services\MeetingToContractMigrationService;
 use Modules\CustomersMeetings\Repositories\MeetingRepository;
 use Modules\CustomersMeetings\Services\MeetingSettingsService;
+use Throwable;
 
 class MeetingActionController extends Controller
 {
@@ -247,24 +249,62 @@ class MeetingActionController extends Controller
 
     // --- Create contract from meeting ---
 
-    public function createContract(int $id, Request $request): JsonResponse
+    /**
+     * Story M4 — transform a meeting into a contract.
+     *
+     * Creates a CustomerContract from the meeting (customer / polluter /
+     * company / dates / created_by) and migrates every meeting-attached
+     * quotation onto the new contract (sets contract_id, keeps meeting_id).
+     * Idempotent: if a contract is already linked to this meeting, returns
+     * it without recreating.
+     */
+    public function createContract(int $id, Request $request, MeetingToContractMigrationService $migration): JsonResponse
     {
         $meeting = $this->findOrFail($id);
 
-        // Update meeting status to transfer
+        if (! $meeting->customer_id || ! $meeting->polluter_id) {
+            return response()->json([
+                'success' => false,
+                'action' => 'CreateContract',
+                'message' => 'Meeting is incomplete: a customer and a polluter are required',
+            ], 422);
+        }
+
+        try {
+            $result = $migration->transform($meeting, (int) ($request->user()?->getKey() ?? 0) ?: null);
+        } catch (Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'action' => 'CreateContract',
+                'message' => $e->getMessage(),
+            ], 422);
+        }
+
+        // Move the meeting to the "transferred" state if the tenant has one
+        // configured. Idempotent: re-running on an already-transformed
+        // meeting just keeps the same state.
         $transferStatusId = $this->settings->getStatusTransferToContract();
-        if ($transferStatusId) {
+        if ($transferStatusId && (int) $meeting->state_id !== $transferStatusId) {
             $meeting->update(['state_id' => $transferStatusId]);
         }
 
-        $this->repository->logHistory($meeting, 'Contract creation initiated from meeting', $request->user());
+        $this->repository->logHistory(
+            $meeting,
+            $result['already_existed']
+                ? 'Contract already existed; quotations re-synced'
+                : 'Contract created from meeting',
+            $request->user()
+        );
 
         return response()->json([
             'success' => true,
             'action' => 'CreateContract',
             'meeting_id' => $meeting->id,
             'customer_id' => $meeting->customer_id,
-            'message' => 'Contract creation initiated',
+            'contract_id' => $result['contract']->id,
+            'reference' => $result['contract']->reference,
+            'quotations_migrated' => $result['quotations_migrated'],
+            'already_existed' => $result['already_existed'],
         ]);
     }
 

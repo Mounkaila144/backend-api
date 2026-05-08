@@ -73,6 +73,14 @@ Route::prefix('api/admin')->middleware(['tenant', 'auth:sanctum'])->group(functi
             ->name('quotations.contract.simulate');
         Route::post('/quotations/contracts/{contractId}/create', [Iso3QuotationController::class, 'createForContract'])
             ->name('quotations.contract.create');
+
+        // Quotations for Meeting (Story M0)
+        Route::get('/quotations/meetings/{meetingId}/new-form', [Iso3QuotationController::class, 'getMeetingNewForm'])
+            ->name('quotations.meeting.new-form');
+        Route::post('/quotations/meetings/{meetingId}/simulate', [Iso3QuotationController::class, 'simulateForMeeting'])
+            ->name('quotations.meeting.simulate');
+        Route::post('/quotations/meetings/{meetingId}/create', [Iso3QuotationController::class, 'createForMeeting'])
+            ->name('quotations.meeting.create');
         // Route::put('/quotations/contract/{id}', [Iso3QuotationController::class, 'updateQuotationContract'])->name('quotations.contract.update');
 
         // Billings & Quotations lists for contract/meeting view
@@ -93,9 +101,16 @@ Route::prefix('api/admin')->middleware(['tenant', 'auth:sanctum'])->group(functi
 
         // Contract-level document PDF exports
         Route::get('/contracts/{contractId}/export/premeeting-pdf', [Iso3DocumentController::class, 'exportPreMeetingPdf'])->name('contracts.export.premeeting-pdf');
+        // Meeting-level document PDF exports (Story M1)
+        Route::get('/meetings/{meetingId}/export/premeeting-pdf', [Iso3DocumentController::class, 'exportPreMeetingPdfForMeeting'])->name('meetings.export.premeeting-pdf');
         Route::get('/contracts/{contractId}/export/afterwork-pdf', [Iso3DocumentController::class, 'exportAfterWorkPdf'])->name('contracts.export.afterwork-pdf');
         Route::get('/contracts/{contractId}/export/all-documents-pdf', [Iso3DocumentController::class, 'exportAllDocumentsByContractPdf'])->name('contracts.export.all-documents-pdf');
         Route::get('/contracts/{contractId}/export/all-signed-pdf', [Iso3DocumentController::class, 'exportAllSignedByContractPdf'])->name('contracts.export.all-signed-pdf');
+
+        // Official ITE AH documents (devis & facture uniques signés)
+        // Symfony: /app_domoprime_iso3/documentITEForViewContract + documentITEBillingForViewContract
+        Route::get('/contracts/{contractId}/export/ite-ah-quotation-pdf', [Iso3DocumentController::class, 'exportIteAhQuotationPdf'])->name('contracts.export.ite-ah-quotation-pdf');
+        Route::get('/contracts/{contractId}/export/ite-ah-billing-pdf', [Iso3DocumentController::class, 'exportIteAhBillingPdf'])->name('contracts.export.ite-ah-billing-pdf');
 
         // Billing Actions
         Route::get('/export/billing/{id}/pdf', [Iso3DocumentController::class, 'exportBillingPdf'])->name('export.billing-pdf');

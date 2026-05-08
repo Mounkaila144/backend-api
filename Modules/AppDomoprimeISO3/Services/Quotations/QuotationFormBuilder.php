@@ -7,6 +7,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Modules\AppDomoprime\Entities\DomoprimeSubventionType;
 use Modules\CustomersContracts\Entities\CustomerContract;
+use Modules\CustomersMeetings\Entities\CustomerMeeting;
 use Modules\Product\Entities\Product;
 use Modules\Product\Entities\ProductItem;
 
@@ -19,11 +20,12 @@ class QuotationFormBuilder
     }
 
     /**
+     * @param  CustomerContract|CustomerMeeting  $parent
      * @param  ?object  $user  Authenticated user (must expose hasCredential()) — null = no gating (admin context)
      */
-    public function build(CustomerContract $contract, string $mode = 'standard', ?object $user = null): array
+    public function build(CustomerContract|CustomerMeeting $parent, string $mode = 'standard', ?object $user = null): array
     {
-        $polluter = $contract->getRelationValue('polluter');
+        $polluter = $parent->getRelationValue('polluter');
         $type = strtoupper((string) ($polluter?->type ?? ''));
         $polluterId = (int) ($polluter?->getKey() ?? 0);
 
@@ -35,23 +37,36 @@ class QuotationFormBuilder
         // setProductMasterItemPricingForNewQuotationContract). Without it, master items
         // keep their raw t_products_item.sale_price.
         if ($type === 'ITE' && $this->canOverrideMasterPrice($user)) {
-            $categories = $this->applyIteMasterPriceOverride($contract, $categories);
+            $categories = $this->applyIteMasterPriceOverride($parent, $categories);
         }
 
         // Symfony parity: every item's default quantity = getITESurface() = intval(surface_ite)
         // (cf. DomoprimeQuotationITENew3ForContractForm::configure). Applied to ALL items —
         // master AND others — not just is_parent ones.
         if ($type === 'ITE') {
-            $categories = $this->applyIteDefaultQuantity($contract, $categories);
+            $categories = $this->applyIteDefaultQuantity($parent, $categories);
         }
 
-        $permissions = $this->resolvePermissions($user);
+        $permissions = $this->resolvePermissions($parent, $user);
 
         return [
-            'contract' => [
-                'id' => $contract->getKey(),
-                'reference' => $contract->reference,
+            'parent_type' => $parent instanceof CustomerContract ? 'contract' : 'meeting',
+            'parent' => [
+                'id' => $parent->getKey(),
+                'reference' => $parent instanceof CustomerContract
+                    ? (string) ($parent->reference ?? '')
+                    : (string) ($parent->registration ?? ''),
             ],
+            // Back-compat: keep `contract` key when parent is a contract so existing
+            // frontend code (CreateQuotationDialog) continues to find it.
+            'contract' => $parent instanceof CustomerContract ? [
+                'id' => $parent->getKey(),
+                'reference' => $parent->reference,
+            ] : null,
+            'meeting' => $parent instanceof CustomerMeeting ? [
+                'id' => $parent->getKey(),
+                'reference' => (string) ($parent->registration ?? ''),
+            ] : null,
             'polluter' => [
                 'id' => $polluter?->getKey(),
                 'name' => $polluter?->name,
@@ -61,7 +76,7 @@ class QuotationFormBuilder
             'mode' => $mode,
             'quantity_kind' => $this->quantityKind($type),
             'defaults' => [
-                'dated_at' => $this->formatDate($contract->quoted_at ?? null),
+                'dated_at' => $this->resolveDefaultDatedAt($parent),
                 'discount_amount' => 0,
                 'subvention_type_id' => null,
             ],
@@ -97,10 +112,10 @@ class QuotationFormBuilder
      * @param  array<int, array<string, mixed>>  $categories
      * @return array<int, array<string, mixed>>
      */
-    private function applyIteDefaultQuantity(CustomerContract $contract, array $categories): array
+    private function applyIteDefaultQuantity(CustomerContract|CustomerMeeting $parent, array $categories): array
     {
         try {
-            $request = $this->iteCumacResolver->customerRequest($contract);
+            $request = $this->iteCumacResolver->customerRequest($parent);
         } catch (\Throwable) {
             $request = null;
         }
@@ -129,10 +144,10 @@ class QuotationFormBuilder
      * @param  array<int, array<string, mixed>>  $categories
      * @return array<int, array<string, mixed>>
      */
-    private function applyIteMasterPriceOverride(CustomerContract $contract, array $categories): array
+    private function applyIteMasterPriceOverride(CustomerContract|CustomerMeeting $parent, array $categories): array
     {
         try {
-            $masterPriceHt = $this->iteCumacResolver->resolveMasterPriceHt($contract);
+            $masterPriceHt = $this->iteCumacResolver->resolveMasterPriceHt($parent);
         } catch (\Throwable) {
             $masterPriceHt = null;
         }
@@ -158,22 +173,46 @@ class QuotationFormBuilder
      * Mirror Symfony per-field credential gating. When $user is null (e.g. unit
      * tests, internal callers) every gate defaults to true.
      *
+     * Credential names follow the convention
+     *   app_domoprime_iso3_<parent>_view_quotation_new_<field>
+     * with <parent> being either `contract` or `meeting`.
+     *
      * @return array<string, bool>
      */
-    private function resolvePermissions(?object $user): array
+    private function resolvePermissions(CustomerContract|CustomerMeeting $parent, ?object $user): array
     {
-        $can = function (string $credential) use ($user): bool {
+        // Symfony names the form-field credentials per parent (contract /
+        // meeting). Until the meeting-side credentials are seeded we accept
+        // either name — admins keep their access to the field instead of
+        // silently hiding it.
+        $can = function (string $field) use ($user): bool {
             if ($user === null || ! method_exists($user, 'hasCredential')) {
                 return true;
             }
-            return (bool) $user->hasCredential([[$credential]]);
+            $credentials = [
+                'app_domoprime_iso3_contract_view_quotation_new_'.$field,
+                'app_domoprime_iso3_meeting_view_quotation_new_'.$field,
+            ];
+            return (bool) $user->hasCredential([$credentials]);
         };
 
         return [
-            'can_set_dated_at' => $can('app_domoprime_iso3_contract_view_quotation_new_dated_at'),
-            'can_set_subvention_type' => $can('app_domoprime_iso3_contract_view_quotation_new_subvention_type'),
-            'can_set_discount_amount' => $can('app_domoprime_iso3_contract_view_quotation_new_discount_amount'),
+            'can_set_dated_at' => $can('dated_at'),
+            'can_set_subvention_type' => $can('subvention_type'),
+            'can_set_discount_amount' => $can('discount_amount'),
         ];
+    }
+
+    private function resolveDefaultDatedAt(CustomerContract|CustomerMeeting $parent): ?string
+    {
+        if ($parent instanceof CustomerContract) {
+            return $this->formatDate($parent->quoted_at ?? null);
+        }
+
+        // Meeting has no `quoted_at` — fall back to today (Symfony Form
+        // configure() defaults to date('Y-m-d') when the meeting hasn't
+        // been quoted yet).
+        return $this->formatDate(now());
     }
 
     /**

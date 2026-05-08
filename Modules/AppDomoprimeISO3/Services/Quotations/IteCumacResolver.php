@@ -8,29 +8,30 @@ use Modules\AppDomoprimeISO3\Entities\DomoprimeIsoCumacClassRegionPrice;
 use Modules\AppDomoprimeISO3\Entities\DomoprimeIsoCumacClassRegionPriceSurface;
 use Modules\AppDomoprimeISO3\Entities\DomoprimePolluterClassSectorEnergy;
 use Modules\CustomersContracts\Entities\CustomerContract;
+use Modules\CustomersMeetings\Entities\CustomerMeeting;
 
 class IteCumacResolver
 {
     /**
      * Resolve the CUMAC unitary coefficient (kWhcumac/m2) and the polluter
-     * EUR/kWhcumac price for the given contract. Returns null when any of
-     * the required pieces (customer request, zone, class, polluter pricing,
-     * surface bracket coefficient) is missing — the engine then falls back
-     * to CUMAC=0 / Prime=0 just like the patched Symfony engine.
+     * EUR/kWhcumac price for the given parent (Contract or Meeting). Returns
+     * null when any of the required pieces (customer request, zone, class,
+     * polluter pricing, surface bracket coefficient) is missing — the engine
+     * then falls back to CUMAC=0 / Prime=0 just like the patched Symfony engine.
      */
-    public function resolve(CustomerContract $contract, float $surface): ?IteCumacContext
+    public function resolve(CustomerContract|CustomerMeeting $parent, float $surface): ?IteCumacContext
     {
-        $polluterId = (int) ($contract->polluter_id ?? 0);
+        $polluterId = (int) ($parent->polluter_id ?? 0);
         if ($polluterId <= 0 || $surface <= 0) {
             return null;
         }
 
-        $request = $this->customerRequest($contract);
+        $request = $this->customerRequest($parent);
         if (! $request || ! $request->energy_id || ! $request->pricing_id) {
             return null;
         }
 
-        $zone = $this->resolveZone($contract);
+        $zone = $this->resolveZone($parent);
         if (! $zone) {
             return null;
         }
@@ -92,15 +93,15 @@ class IteCumacResolver
      * DomoprimeQuotationPricingContractEngine::process():
      *   sale_price = surface_coef / (more_2_years === 'YES' ? 1.055 : 1.2)
      */
-    public function resolveMasterPriceHt(CustomerContract $contract): ?float
+    public function resolveMasterPriceHt(CustomerContract|CustomerMeeting $parent): ?float
     {
-        $request = $this->customerRequest($contract);
+        $request = $this->customerRequest($parent);
         if (! $request) {
             return null;
         }
 
         $homeSurface = (float) ($request->surface_home ?? 0);
-        $context = $this->resolve($contract, $homeSurface);
+        $context = $this->resolve($parent, $homeSurface);
         if (! $context) {
             return null;
         }
@@ -111,22 +112,30 @@ class IteCumacResolver
         return round($context->surfaceCoef / $tvaFactor, 3);
     }
 
-    public function customerRequest(CustomerContract $contract): ?DomoprimeIsoCustomerRequest
+    public function customerRequest(CustomerContract|CustomerMeeting $parent): ?DomoprimeIsoCustomerRequest
     {
-        if ($contract->relationLoaded('domoprimeIsoRequest')) {
-            $relation = $contract->getRelation('domoprimeIsoRequest');
-            return $relation instanceof DomoprimeIsoCustomerRequest ? $relation : $relation->last();
+        // Contract uses `domoprimeIsoRequest` (HasMany); Meeting uses
+        // `domoprimeRequest` (HasOne). When eager-loaded, unwrap accordingly.
+        $relationName = $parent instanceof CustomerContract ? 'domoprimeIsoRequest' : 'domoprimeRequest';
+        if ($parent->relationLoaded($relationName)) {
+            $relation = $parent->getRelation($relationName);
+            if ($relation instanceof DomoprimeIsoCustomerRequest) {
+                return $relation;
+            }
+            return $relation?->last();
         }
 
+        $foreignKey = $parent instanceof CustomerContract ? 'contract_id' : 'meeting_id';
+
         return DomoprimeIsoCustomerRequest::query()
-            ->where('contract_id', $contract->id)
+            ->where($foreignKey, $parent->id)
             ->orderByDesc('id')
             ->first();
     }
 
-    private function resolveZone(CustomerContract $contract): ?DomoprimeZone
+    private function resolveZone(CustomerContract|CustomerMeeting $parent): ?DomoprimeZone
     {
-        $customer = $contract->getRelationValue('customer');
+        $customer = $parent->getRelationValue('customer');
         if (! $customer) {
             return null;
         }

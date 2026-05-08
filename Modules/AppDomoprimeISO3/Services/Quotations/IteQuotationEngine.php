@@ -3,6 +3,7 @@
 namespace Modules\AppDomoprimeISO3\Services\Quotations;
 
 use Modules\CustomersContracts\Entities\CustomerContract;
+use Modules\CustomersMeetings\Entities\CustomerMeeting;
 
 class IteQuotationEngine extends AbstractQuotationEngine
 {
@@ -11,7 +12,7 @@ class IteQuotationEngine extends AbstractQuotationEngine
     protected const DEFAULT_TVA_RATE = 5.5;
 
     private ?IteCumacContext $cachedContext = null;
-    private ?int $cachedContractId = null;
+    private ?string $cachedParentKey = null;
     private ?float $cachedSurface = null;
 
     public function __construct(private readonly IteCumacResolver $resolver = new IteCumacResolver())
@@ -26,14 +27,14 @@ class IteQuotationEngine extends AbstractQuotationEngine
     /**
      * @param  array<int, array<string, mixed>>  $items
      */
-    protected function computeCumac(CustomerContract $contract, array $items): float
+    protected function computeCumac(CustomerContract|CustomerMeeting $parent, array $items): float
     {
-        $context = $this->resolveContext($contract, $items);
+        $context = $this->resolveContext($parent, $items);
 
         return $context?->cumac() ?? 0.0;
     }
 
-    protected function computeCeePrime(CustomerContract $contract, float $cumac): float
+    protected function computeCeePrime(CustomerContract|CustomerMeeting $parent, float $cumac): float
     {
         if ($this->cachedContext === null || $cumac <= 0) {
             return 0.0;
@@ -51,13 +52,13 @@ class IteQuotationEngine extends AbstractQuotationEngine
      * @param  array<int, array<string, mixed>>  $items
      * @return array{0: float, 1: float}  [ceeAuto, anaAuto]
      */
-    protected function computeAutoPrimes(CustomerContract $contract, array $items): array
+    protected function computeAutoPrimes(CustomerContract|CustomerMeeting $parent, array $items): array
     {
-        $request = $this->resolver->customerRequest($contract);
+        $request = $this->resolver->customerRequest($parent);
         $surfaceIte = (int) ($request?->surface_ite ?? 0);
 
         // Ensure context is resolved so we can read polluterEurPerKwhCumac.
-        $this->resolveContext($contract, $items);
+        $this->resolveContext($parent, $items);
         $polluterUnitPrice = $this->cachedContext?->polluterEurPerKwhCumac ?? 0.0;
 
         if ($surfaceIte <= 0 || $polluterUnitPrice <= 0) {
@@ -71,23 +72,23 @@ class IteQuotationEngine extends AbstractQuotationEngine
     /**
      * @param  array<int, array<string, mixed>>  $items
      */
-    private function resolveContext(CustomerContract $contract, array $items): ?IteCumacContext
+    private function resolveContext(CustomerContract|CustomerMeeting $parent, array $items): ?IteCumacContext
     {
         $surface = 0.0;
         foreach ($items as $line) {
             $surface += (float) ($line['quantity'] ?? 0);
         }
 
-        $contractId = (int) $contract->getKey();
+        $parentKey = ($parent instanceof CustomerContract ? 'C' : 'M').':'.(int) $parent->getKey();
         if ($this->cachedContext !== null
-            && $this->cachedContractId === $contractId
+            && $this->cachedParentKey === $parentKey
             && $this->cachedSurface === $surface) {
             return $this->cachedContext;
         }
 
-        $this->cachedContractId = $contractId;
+        $this->cachedParentKey = $parentKey;
         $this->cachedSurface = $surface;
-        $this->cachedContext = $this->resolver->resolve($contract, $surface);
+        $this->cachedContext = $this->resolver->resolve($parent, $surface);
 
         return $this->cachedContext;
     }

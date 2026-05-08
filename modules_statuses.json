@@ -9,6 +9,7 @@
     "Superadmin": true,
     "AppDomoprime": true,
     "AppDomoprimeISO3": true,
+    "AppDomoprimeYousignEvidence": true,
     "CustomersMeetings": true,
     "CustomersContractsBilling": false,
     "CustomersContractsComments": true,

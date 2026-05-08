@@ -9,6 +9,7 @@ use Modules\AppDomoprime\Entities\DomoprimeQuotationProduct;
 use Modules\AppDomoprime\Entities\DomoprimeQuotationProductItem;
 use Modules\AppDomoprimeISO3\Services\Quotations\Contracts\QuotationEngineInterface;
 use Modules\CustomersContracts\Entities\CustomerContract;
+use Modules\CustomersMeetings\Entities\CustomerMeeting;
 use Modules\Product\Entities\ProductItem;
 use RuntimeException;
 
@@ -18,19 +19,19 @@ abstract class AbstractQuotationEngine implements QuotationEngineInterface
 
     abstract public function type(): string;
 
-    public function simulate(CustomerContract $contract, array $payload): array
+    public function simulate(CustomerContract|CustomerMeeting $parent, array $payload): array
     {
         $items = $this->resolveItems($payload);
         $tvaRate = $this->resolveTvaRate($payload);
 
         $totals = $this->aggregateTotals($items, $tvaRate);
-        $cumac = $this->computeCumac($contract, $items);
+        $cumac = $this->computeCumac($parent, $items);
 
         // Symfony "Automatic subvention" panel formulas (DomoprimeQuotation::getITEPrime
         // + ::getAnaPrime). For ITE: ite_prime = surface_ite * polluter_pricing.price.
         // ana_prime = -ite_prime so they cancel each other in the rest_in_charge
         // formula → reste = total_with_tax (matches Symfony).
-        [$ceeAuto, $anaAuto] = $this->computeAutoPrimes($contract, $items);
+        [$ceeAuto, $anaAuto] = $this->computeAutoPrimes($parent, $items);
         $discountAuto = 0.0;
 
         // Symfony "Manuel subvention" overrides: only the manually-checked values
@@ -86,7 +87,7 @@ abstract class AbstractQuotationEngine implements QuotationEngineInterface
         ];
     }
 
-    public function create(CustomerContract $contract, array $payload, int $userId): DomoprimeQuotation
+    public function create(CustomerContract|CustomerMeeting $parent, array $payload, int $userId): DomoprimeQuotation
     {
         $items = $this->resolveItems($payload);
 
@@ -96,14 +97,15 @@ abstract class AbstractQuotationEngine implements QuotationEngineInterface
 
         $tvaRate = $this->resolveTvaRate($payload);
         $totals = $this->aggregateTotals($items, $tvaRate);
-        $cumac = $this->computeCumac($contract, $items);
-        $ceePrime = $this->computeCeePrime($contract, $cumac);
-        $anaPrime = $this->computeAnaPrime($contract, $items);
+        $cumac = $this->computeCumac($parent, $items);
+        $ceePrime = $this->computeCeePrime($parent, $cumac);
+        $anaPrime = $this->computeAnaPrime($parent, $items);
 
         return DB::connection('tenant')->transaction(function () use (
-            $contract, $payload, $userId, $items, $tvaRate, $totals, $cumac, $ceePrime, $anaPrime
+            $parent, $payload, $userId, $items, $tvaRate, $totals, $cumac, $ceePrime, $anaPrime
         ) {
-            $datedAt = $this->resolveDatedAt($payload, $contract);
+            $datedAt = $this->resolveDatedAt($payload, $parent);
+            $context = $this->resolveParentContext($parent);
 
             $quotation = new DomoprimeQuotation();
             $quotation->reference = '';
@@ -114,11 +116,11 @@ abstract class AbstractQuotationEngine implements QuotationEngineInterface
             // 'multiple' = part of a multi-quotation set (not used here yet).
             $quotation->mode = 'simple';
             $quotation->type = strtoupper($this->type());
-            $quotation->contract_id = $contract->id;
-            $quotation->meeting_id = $contract->meeting_id;
-            $quotation->customer_id = $contract->customer_id;
-            $quotation->company_id = $contract->company_id;
-            $quotation->polluter_id = $contract->polluter_id;
+            $quotation->contract_id = $context['contract_id'];
+            $quotation->meeting_id = $context['meeting_id'];
+            $quotation->customer_id = $context['customer_id'];
+            $quotation->company_id = $context['company_id'];
+            $quotation->polluter_id = $context['polluter_id'];
             $quotation->creator_id = $userId;
             $quotation->subvention_type_id = $payload['subvention_type_id'] ?? null;
             $quotation->discount_amount = (float) ($payload['discount_amount'] ?? 0);
@@ -139,18 +141,79 @@ abstract class AbstractQuotationEngine implements QuotationEngineInterface
             $quotation->reference = sprintf('DEV-%d', $quotation->id);
             $quotation->save();
 
-            DomoprimeQuotation::query()
-                ->where('contract_id', $contract->id)
-                ->where('id', '!=', $quotation->id)
-                ->update(['is_last' => 'NO']);
+            // Mirror Symfony updateLastFromContract / updateLastFromMeeting:
+            // demote previous quotations attached to the same parent.
+            $sameParentQuery = DomoprimeQuotation::query()->where('id', '!=', $quotation->id);
+            if ($context['contract_id']) {
+                $sameParentQuery->where('contract_id', $context['contract_id']);
+            } elseif ($context['meeting_id']) {
+                $sameParentQuery->where('meeting_id', $context['meeting_id'])
+                    ->whereNull('contract_id');
+            }
+            $sameParentQuery->update(['is_last' => 'NO']);
 
             $this->persistItems($quotation, $items, $tvaRate);
 
-            $contract->is_signed = 'NO';
-            $contract->save();
+            $this->updateParentAfterCreate($parent, $datedAt);
 
             return $quotation->fresh(['products']);
         });
+    }
+
+    /**
+     * Resolve the persisted parent context: contract_id, meeting_id, customer_id,
+     * polluter_id, company_id. Both contract and meeting expose the same
+     * triplet (customer / polluter / company) — the only thing that changes is
+     * which FK is set on the new DomoprimeQuotation row.
+     *
+     * @return array{contract_id: ?int, meeting_id: ?int, customer_id: ?int, polluter_id: ?int, company_id: ?int}
+     */
+    protected function resolveParentContext(CustomerContract|CustomerMeeting $parent): array
+    {
+        if ($parent instanceof CustomerContract) {
+            return [
+                'contract_id' => (int) $parent->id,
+                'meeting_id' => $parent->meeting_id ? (int) $parent->meeting_id : null,
+                'customer_id' => $parent->customer_id ? (int) $parent->customer_id : null,
+                'polluter_id' => $parent->polluter_id ? (int) $parent->polluter_id : null,
+                'company_id' => $parent->company_id ? (int) $parent->company_id : null,
+            ];
+        }
+
+        // CustomerMeeting: contract_id is null at create time. If a contract is
+        // already linked to this meeting we surface it so the quotation points
+        // to both — the Symfony createFromMeeting() does the same.
+        $linkedContractId = CustomerContract::query()
+            ->where('meeting_id', $parent->id)
+            ->value('id');
+
+        return [
+            'contract_id' => $linkedContractId ? (int) $linkedContractId : null,
+            'meeting_id' => (int) $parent->id,
+            'customer_id' => $parent->customer_id ? (int) $parent->customer_id : null,
+            'polluter_id' => $parent->polluter_id ? (int) $parent->polluter_id : null,
+            'company_id' => $parent->company_id ? (int) $parent->company_id : null,
+        ];
+    }
+
+    /**
+     * Symfony post-create side-effects on the parent entity.
+     * - Contract: `is_signed = 'NO'` (resets signature flag for re-signature).
+     * - Meeting: `opc_at = quotation.dated_at` (stamp). The Symfony code also
+     *   sets `is_signed='NO'` on the meeting, but the Laravel
+     *   `t_customers_meeting` schema has no such column — the mfObject3 setter
+     *   was a silent no-op in production. We keep parity by skipping it here.
+     */
+    protected function updateParentAfterCreate(CustomerContract|CustomerMeeting $parent, Carbon $datedAt): void
+    {
+        if ($parent instanceof CustomerContract) {
+            $parent->is_signed = 'NO';
+            $parent->save();
+            return;
+        }
+
+        $parent->opc_at = $datedAt;
+        $parent->save();
     }
 
     /**
@@ -244,7 +307,7 @@ abstract class AbstractQuotationEngine implements QuotationEngineInterface
     /**
      * @param  array<int, array<string, mixed>>  $items
      */
-    abstract protected function computeCumac(CustomerContract $contract, array $items): float;
+    abstract protected function computeCumac(CustomerContract|CustomerMeeting $parent, array $items): float;
 
     /**
      * Symfony "Automatic subvention" pair (ite_prime, ana_prime).
@@ -256,12 +319,12 @@ abstract class AbstractQuotationEngine implements QuotationEngineInterface
      * @param  array<int, array<string, mixed>>  $items
      * @return array{0: float, 1: float}  [ceeAuto, anaAuto]
      */
-    protected function computeAutoPrimes(CustomerContract $contract, array $items): array
+    protected function computeAutoPrimes(CustomerContract|CustomerMeeting $parent, array $items): array
     {
         return [0.0, 0.0];
     }
 
-    protected function computeCeePrime(CustomerContract $contract, float $cumac): float
+    protected function computeCeePrime(CustomerContract|CustomerMeeting $parent, float $cumac): float
     {
         // Default: no CEE prime when no pricing config is available.
         // Subclasses may override with full polluter pricing lookup.
@@ -271,7 +334,7 @@ abstract class AbstractQuotationEngine implements QuotationEngineInterface
     /**
      * @param  array<int, array<string, mixed>>  $items
      */
-    protected function computeAnaPrime(CustomerContract $contract, array $items): float
+    protected function computeAnaPrime(CustomerContract|CustomerMeeting $parent, array $items): float
     {
         return 0.0;
     }
@@ -281,9 +344,12 @@ abstract class AbstractQuotationEngine implements QuotationEngineInterface
         return isset($payload['tva_rate']) ? (float) $payload['tva_rate'] : static::DEFAULT_TVA_RATE;
     }
 
-    protected function resolveDatedAt(array $payload, CustomerContract $contract): Carbon
+    protected function resolveDatedAt(array $payload, CustomerContract|CustomerMeeting $parent): Carbon
     {
-        $raw = $payload['dated_at'] ?? $contract->quoted_at ?? null;
+        $raw = $payload['dated_at'] ?? null;
+        if ($raw === null && $parent instanceof CustomerContract) {
+            $raw = $parent->quoted_at ?? null;
+        }
         if ($raw instanceof Carbon) {
             return $raw->copy();
         }
