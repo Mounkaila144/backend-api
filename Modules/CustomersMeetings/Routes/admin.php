@@ -14,7 +14,7 @@ use Modules\CustomersMeetings\Http\Controllers\Admin\TourGeneratorController;
 |--------------------------------------------------------------------------
 */
 
-Route::prefix('api/admin')->middleware(['api', 'tenant', 'auth:sanctum'])->group(function () {
+Route::prefix('api/admin')->middleware(['api', 'tenant', 'auth:sanctum', 'block.superadmin.host'])->group(function () {
     Route::prefix('customersmeetings')->name('admin.customersmeetings.')->group(function () {
         // Legacy placeholder routes
         Route::get('/legacy', [IndexController::class, 'index'])->name('legacy.index');

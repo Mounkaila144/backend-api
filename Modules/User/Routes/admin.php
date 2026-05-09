@@ -14,7 +14,7 @@ use Modules\User\Http\Controllers\Admin\UserSearchController;
 */
 
 // Routes globales admin (authentification + tenant requis)
-Route::prefix('api/admin')->middleware(['api', 'tenant', 'auth:sanctum'])->group(function () {
+Route::prefix('api/admin')->middleware(['api', 'tenant', 'auth:sanctum', 'block.superadmin.host'])->group(function () {
 
     // User management routes - Symfony 1 style credentials
     Route::prefix('users')->name('admin.users.')->group(function () {

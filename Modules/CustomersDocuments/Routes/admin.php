@@ -3,7 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Modules\CustomersDocuments\Http\Controllers\Admin\DocumentController;
 
-Route::prefix('api/admin')->middleware(['api', 'tenant', 'auth:sanctum'])->group(function () {
+Route::prefix('api/admin')->middleware(['api', 'tenant', 'auth:sanctum', 'block.superadmin.host'])->group(function () {
     Route::prefix('customersdocuments')->name('admin.customersdocuments.')->group(function () {
         // Settings
         Route::get('/settings', [DocumentController::class, 'getSettings'])->name('settings');

@@ -10,7 +10,7 @@ use Modules\Customer\Http\Controllers\Admin\CustomerController;
 | Ces routes utilisent la base de donnÃ©es du tenant
 */
 
-Route::prefix('api/admin')->middleware(['api', 'tenant', 'auth:sanctum'])->group(function () {
+Route::prefix('api/admin')->middleware(['api', 'tenant', 'auth:sanctum', 'block.superadmin.host'])->group(function () {
     Route::prefix('customers')->name('admin.customers.')->group(function () {
         // Customer CRUD
         Route::get('/', [CustomerController::class, 'index'])->name('index');

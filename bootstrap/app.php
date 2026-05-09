@@ -51,9 +51,12 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Enregistrer les alias middleware
         $middleware->alias([
-            'tenant' => \App\Http\Middleware\InitializeTenancy::class,
-            'permission' => \App\Http\Middleware\CheckPermission::class,
-            'credential' => \App\Http\Middleware\CheckCredential::class,
+            'tenant'             => \App\Http\Middleware\InitializeTenancy::class,
+            'permission'         => \App\Http\Middleware\CheckPermission::class,
+            'credential'         => \App\Http\Middleware\CheckCredential::class,
+            // Host-scoping for the superadmin surface
+            'superadmin.host'    => \App\Http\Middleware\EnforceSuperadminHost::class,
+            'block.superadmin.host' => \App\Http\Middleware\BlockSuperadminHost::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

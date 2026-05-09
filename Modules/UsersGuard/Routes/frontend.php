@@ -9,7 +9,7 @@ use Modules\UsersGuard\Http\Controllers\Frontend\IndexController;
 | Ces routes utilisent la base de données du tenant
 */
 
-Route::prefix('frontend')->middleware(['api', 'tenant'])->group(function () {
+Route::prefix('frontend')->middleware(['api', 'tenant', 'block.superadmin.host'])->group(function () {
     Route::prefix('usersguard')->group(function () {
         // Public routes
         Route::get('/', [IndexController::class, 'index']);

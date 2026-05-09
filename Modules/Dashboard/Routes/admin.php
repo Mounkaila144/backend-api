@@ -11,7 +11,7 @@ use Modules\Dashboard\Http\Controllers\Admin\MenuController;
 | Ces routes utilisent la base de données du tenant
 */
 
-Route::prefix('api/admin')->middleware(['api', 'tenant', 'auth:sanctum'])->group(function () {
+Route::prefix('api/admin')->middleware(['api', 'tenant', 'auth:sanctum', 'block.superadmin.host'])->group(function () {
     Route::prefix('dashboard')->name('admin.dashboard.')->group(function () {
         Route::get('/', [IndexController::class, 'index'])->name('index');
         Route::post('/', [IndexController::class, 'store'])->name('store');

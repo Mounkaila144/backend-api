@@ -16,7 +16,7 @@ use Modules\AppDomoprimeISO3\Http\Controllers\Admin\Iso3ResultsController;
 | Middleware: tenant + auth:sanctum (applied by prefix group).
 */
 
-Route::prefix('api/admin')->middleware(['api', 'tenant', 'auth:sanctum'])->group(function () {
+Route::prefix('api/admin')->middleware(['api', 'tenant', 'auth:sanctum', 'block.superadmin.host'])->group(function () {
     Route::prefix('appdomoprime-iso3')->name('admin.appdomoprime-iso3.')->group(function () {
 
         // Results for contract view (CUMAC + info block)

@@ -11,7 +11,7 @@ use Modules\Dashboard\Http\Controllers\Superadmin\MenuController;
 | Ces routes utilisent la base de données centrale
 */
 
-Route::prefix('api/superadmin')->middleware(['api', 'auth:sanctum'])->group(function () {
+Route::prefix('api/superadmin')->middleware(['api', 'auth:sanctum', 'superadmin.host'])->group(function () {
     Route::prefix('dashboard')->name('superadmin.dashboard.')->group(function () {
         Route::get('/', [IndexController::class, 'index'])->name('index');
         Route::post('/', [IndexController::class, 'store'])->name('store');

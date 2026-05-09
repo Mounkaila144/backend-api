@@ -3,7 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Modules\CustomersMeetingsForms\Http\Controllers\Admin\MeetingFormsController;
 
-Route::prefix('api/admin')->middleware(['api', 'tenant', 'auth:sanctum'])->group(function () {
+Route::prefix('api/admin')->middleware(['api', 'tenant', 'auth:sanctum', 'block.superadmin.host'])->group(function () {
     Route::prefix('customersmeetingsforms')->name('admin.customersmeetingsforms.')->group(function () {
         Route::get('/contracts/{contractId}/forms', [MeetingFormsController::class, 'forContract'])
             ->name('contracts.forms');

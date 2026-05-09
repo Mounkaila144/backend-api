@@ -10,7 +10,7 @@ use Modules\Site\Http\Controllers\Admin\IndexController;
 | Ces routes utilisent la base de donnÃ©es du tenant
 */
 
-Route::prefix('api/admin')->middleware(['auth:sanctum', 'tenant'])->group(function () {
+Route::prefix('api/admin')->middleware(['auth:sanctum', 'tenant', 'block.superadmin.host'])->group(function () {
     Route::prefix('site')->name('admin.site.')->group(function () {
         Route::get('/', [IndexController::class, 'index'])->name('index');
         Route::post('/', [IndexController::class, 'store'])->name('store');

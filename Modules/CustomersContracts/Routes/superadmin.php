@@ -10,7 +10,7 @@ use Modules\CustomersContracts\Http\Controllers\Superadmin\IndexController;
 | Ces routes utilisent la base de données centrale
 */
 
-Route::prefix('api/superadmin')->middleware(['api', 'auth:sanctum'])->group(function () {
+Route::prefix('api/superadmin')->middleware(['api', 'auth:sanctum', 'superadmin.host'])->group(function () {
     Route::prefix('customerscontracts')->name('superadmin.customerscontracts.')->group(function () {
         Route::get('/', [IndexController::class, 'index'])->name('index');
         Route::post('/', [IndexController::class, 'store'])->name('store');
