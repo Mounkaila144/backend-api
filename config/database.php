@@ -60,7 +60,12 @@ return [
             'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
-            ]) : [],
+                // Through an SSH tunnel we connect to 127.0.0.1, so the cert
+                // hostname won't match. Verify the CA chain but not the host
+                // (VERIFY_CA, not VERIFY_IDENTITY). Default true keeps strict
+                // verification for direct connections.
+                PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => env('MYSQL_ATTR_SSL_VERIFY_SERVER_CERT', true),
+            ], fn ($v) => $v !== null) : [],
         ],
 
         // Defensive alias: stancl/tenancy reads `central_connection` from
@@ -87,7 +92,8 @@ return [
             'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
-            ]) : [],
+                PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT => env('MYSQL_ATTR_SSL_VERIFY_SERVER_CERT', true),
+            ], fn ($v) => $v !== null) : [],
         ],
 
         'mariadb' => [

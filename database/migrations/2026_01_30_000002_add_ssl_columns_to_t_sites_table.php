@@ -12,9 +12,15 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('t_sites', function (Blueprint $table) {
-            $table->enum('site_db_ssl_enabled', ['YES', 'NO'])->default('NO')->after('site_db_password');
-            $table->enum('site_db_ssl_mode', ['DISABLED', 'PREFERRED', 'REQUIRED', 'VERIFY_CA', 'VERIFY_IDENTITY'])->default('PREFERRED')->after('site_db_ssl_enabled');
-            $table->text('site_db_ssl_ca')->nullable()->after('site_db_ssl_mode');
+            if (! Schema::hasColumn('t_sites', 'site_db_ssl_enabled')) {
+                $table->enum('site_db_ssl_enabled', ['YES', 'NO'])->default('NO')->after('site_db_password');
+            }
+            if (! Schema::hasColumn('t_sites', 'site_db_ssl_mode')) {
+                $table->enum('site_db_ssl_mode', ['DISABLED', 'PREFERRED', 'REQUIRED', 'VERIFY_CA', 'VERIFY_IDENTITY'])->default('PREFERRED')->after('site_db_ssl_enabled');
+            }
+            if (! Schema::hasColumn('t_sites', 'site_db_ssl_ca')) {
+                $table->text('site_db_ssl_ca')->nullable()->after('site_db_ssl_mode');
+            }
         });
     }
 

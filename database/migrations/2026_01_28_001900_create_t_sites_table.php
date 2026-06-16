@@ -12,7 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('t_sites', function (Blueprint $table) {
-            $table->integer('site_id')->primary();
+            // increments() = INT UNSIGNED AUTO_INCREMENT PRIMARY KEY (sinon Eloquent
+            // ne peut pas créer de site sans qu'on lui passe explicitement un site_id).
+            $table->increments('site_id');
             $table->string('site_host', 255);
             $table->string('site_name', 255)->nullable();
             $table->string('site_db_name', 100);

@@ -19,7 +19,12 @@
   "mcpServers": {
     "chrome-devtools": {
       "command": "npx",
-      "args": ["@anthropic/claude-mcp-devtools@latest"]
+      "args": [
+        "@anthropic/claude-mcp-devtools@latest"
+      ]
     }
-  }
+  },
+  "enabledMcpjsonServers": [
+    "agentvibes"
+  ]
 }

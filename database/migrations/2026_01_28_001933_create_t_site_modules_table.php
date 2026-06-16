@@ -13,7 +13,9 @@ return new class extends Migration
     {
         Schema::create('t_site_modules', function (Blueprint $table) {
             $table->id();
-            $table->integer('site_id');
+            // unsignedInteger pour matcher t_sites.site_id (increments() = INT UNSIGNED),
+            // sinon la FK fk_site_modules_site échoue (types incompatibles).
+            $table->unsignedInteger('site_id');
             $table->string('module_name', 100);
             $table->enum('is_active', ['YES', 'NO'])->default('YES');
             $table->dateTime('installed_at')->nullable();

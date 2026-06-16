@@ -5,6 +5,7 @@ use Modules\Superadmin\Http\Controllers\Superadmin\ModuleController;
 use Modules\Superadmin\Http\Controllers\Superadmin\AuditController;
 use Modules\Superadmin\Http\Controllers\Superadmin\ServiceConfigController;
 use Modules\Superadmin\Http\Controllers\Superadmin\HealthController;
+use Modules\Superadmin\Http\Controllers\Superadmin\DatabaseController;
 
 /*
 |--------------------------------------------------------------------------
@@ -144,5 +145,15 @@ Route::prefix('api/superadmin')->middleware(['api', 'auth:sanctum', 'superadmin.
                 'message' => 'Module Superadmin opérationnel'
             ]);
         })->name('health');
+    });
+
+    // -----------------------------------------------------------------------
+    // Provisionnement DB tenants : test connexion / création / import dump.
+    // Utilisés par le formulaire "Créer un tenant" pour configurer la DB cible
+    // sans avoir à se connecter manuellement au cloud provider.
+    // -----------------------------------------------------------------------
+    Route::prefix('databases')->name('superadmin.databases.')->group(function () {
+        Route::post('test',      [DatabaseController::class, 'test'])->name('test');
+        Route::post('provision', [DatabaseController::class, 'provision'])->name('provision');
     });
 });
