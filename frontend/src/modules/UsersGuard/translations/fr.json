@@ -1,0 +1,19 @@
+{
+  "Login": "Connexion",
+  "Sign in to your account": "Connectez-vous à votre espace",
+  "Tenant ID": "ID Tenant",
+  "Enter your tenant ID": "Entrez votre ID tenant",
+  "Username": "Nom d'utilisateur",
+  "Enter your username": "Entrez votre nom d'utilisateur",
+  "Password": "Mot de passe",
+  "Enter your password": "Entrez votre mot de passe",
+  "Sign In": "Se connecter",
+  "Invalid credentials": "Identifiants incorrects",
+  "Login successful": "Connexion réussie",
+  "Are you sure you want to logout?": "Êtes-vous sûr de vouloir vous déconnecter ?",
+  "Logout successful": "Déconnexion réussie",
+  "My Profile": "Mon profil",
+  "Email": "Email",
+  "Name": "Nom",
+  "Role": "Rôle"
+}

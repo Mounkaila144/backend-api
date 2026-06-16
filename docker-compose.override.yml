@@ -1,0 +1,56 @@
+# docker-compose.override.yml — DEV (auto-loaded par `docker compose up`).
+# Hot-reload backend (volume bind) + hot-reload frontend (next dev).
+#
+# Démarrer :  docker compose up -d
+# Logs    :  docker compose logs -f app frontend
+# Shell   :  docker compose exec app bash
+
+services:
+  app:
+    build:
+      target: dev
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      PHP_OPCACHE_VALIDATE_TIMESTAMPS: "1"
+      XDEBUG_MODE: ${XDEBUG_MODE:-off}
+      XDEBUG_CONFIG: client_host=host.docker.internal client_port=9003
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  frontend:
+    build:
+      target: dev
+    command: pnpm dev
+    environment:
+      NODE_ENV: development
+      WATCHPACK_POLLING: "true"   # nécessaire sur Windows/WSL pour le hot-reload
+      CHOKIDAR_USEPOLLING: "true"
+
+  nginx:
+    ports:
+      - "8080:80"   # http://localhost:8080 (évite conflit Laragon sur :80)
+
+  # --- phpMyAdmin (DEV uniquement) -----------------------------------------
+  # Outil unifié pour browser/gérer toutes les DBs (Railway + locales).
+  # PMA_ARBITRARY=1 → l'écran de login permet de saisir un host/port/user
+  # arbitraire, pratique pour switcher entre la DB centrale et les DBs tenants.
+  # Pré-rempli avec les credentials du .env pour le 1er login (DB centrale).
+  #
+  # Accès : http://localhost:8081
+  # NE PAS exposer ce service en prod (vecteur d'attaque majeur).
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:5.2
+    restart: unless-stopped
+    environment:
+      PMA_ARBITRARY: 1
+      PMA_HOST: ${DB_HOST:-localhost}
+      PMA_PORT: ${DB_PORT:-3306}
+      PMA_USER: ${DB_USERNAME:-root}
+      PMA_PASSWORD: ${DB_PASSWORD:-}
+      UPLOAD_LIMIT: 1G
+      # Désactive le check de cookie (dev local)
+      MEMORY_LIMIT: 512M
+    ports:
+      - "8081:80"
+    networks: [backend]

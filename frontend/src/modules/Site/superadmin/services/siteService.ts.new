@@ -1,0 +1,121 @@
+import { createApiClient } from '@/shared/lib/api-client';
+import {
+  Site,
+  SiteListItem,
+  CreateSiteData,
+  UpdateSiteData,
+  SiteFilters,
+  SitesListResponse,
+  SiteResponse,
+  ToggleAvailabilityData,
+  TestConnectionResult,
+} from '../../types/site.types';
+import { ApiResponse } from '@/shared/types/api.types';
+
+/**
+ * Service pour gérer les sites (Superadmin uniquement)
+ */
+class SiteService {
+  /**
+   * Récupérer la liste des sites avec filtres et pagination
+   */
+  async getSites(filters?: SiteFilters): Promise<SitesListResponse> {
+    const client = createApiClient();
+
+    const params: Record<string, any> = {};
+
+    if (filters?.search) params.search = filters.search;
+    if (filters?.sort_by) params.sort_by = filters.sort_by;
+    if (filters?.sort_order) params.sort_order = filters.sort_order;
+    if (filters?.available !== undefined) params.available = filters.available;
+    if (filters?.admin_available !== undefined) params.admin_available = filters.admin_available;
+    if (filters?.frontend_available !== undefined) params.frontend_available = filters.frontend_available;
+    if (filters?.is_customer !== undefined) params.is_customer = filters.is_customer;
+    if (filters?.type) params.type = filters.type;
+    if (filters?.per_page) params.per_page = filters.per_page;
+    if (filters?.page) params.page = filters.page;
+
+    const response = await client.get<SitesListResponse>('/superadmin/sites', { params });
+    return response.data;
+  }
+
+  /**
+   * Récupérer les détails d'un site
+   */
+  async getSite(id: number): Promise<Site> {
+    const client = createApiClient();
+    const response = await client.get<SiteResponse>(`/superadmin/sites/${id}`);
+    return response.data.data;
+  }
+
+  /**
+   * Créer un nouveau site
+   */
+  async createSite(data: CreateSiteData): Promise<Site> {
+    const client = createApiClient();
+
+    // Envoyer directement les données sans conversion
+    // Le backend attend YES/NO, pas 1/0
+    const response = await client.post<SiteResponse>('/superadmin/sites', data);
+    return response.data.data;
+  }
+
+  /**
+   * Mettre à jour un site
+   */
+  async updateSite(id: number, data: UpdateSiteData): Promise<Site> {
+    const client = createApiClient();
+
+    // Envoyer directement les données sans conversion
+    // Le backend attend YES/NO, pas 1/0
+    const response = await client.put<SiteResponse>(`/superadmin/sites/${id}`, data);
+    return response.data.data;
+  }
+
+  /**
+   * Supprimer un site
+   */
+  async deleteSite(id: number, deleteDatabase: boolean = false): Promise<void> {
+    const client = createApiClient();
+    await client.delete(`/superadmin/sites/${id}`, {
+      params: { delete_database: deleteDatabase },
+    });
+  }
+
+  /**
+   * Tester la connexion à la base de données d'un site
+   */
+  async testConnection(id: number): Promise<TestConnectionResult> {
+    const client = createApiClient();
+    const response = await client.post<TestConnectionResult>(`/superadmin/sites/${id}/test-connection`);
+    return response.data;
+  }
+
+  /**
+   * Mettre à jour la taille de la base de données d'un site
+   */
+  async updateDatabaseSize(id: number): Promise<Site> {
+    const client = createApiClient();
+    const response = await client.post<SiteResponse>(`/superadmin/sites/${id}/update-size`);
+    return response.data.data;
+  }
+
+  /**
+   * Récupérer les statistiques des sites
+   */
+  async getStatistics(): Promise<SiteStatistics> {
+    const client = createApiClient();
+    const response = await client.get<ApiResponse<SiteStatistics>>('/superadmin/sites/statistics');
+    return response.data.data;
+  }
+
+  /**
+   * Activer/désactiver plusieurs sites
+   */
+  async toggleAvailability(data: ToggleAvailabilityData): Promise<void> {
+    const client = createApiClient();
+    await client.post('/superadmin/sites/toggle-availability', data);
+  }
+}
+
+export const siteService = new SiteService();

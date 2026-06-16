@@ -26,3 +26,6 @@ Thumbs.db
 # Local artifacts
 dump.rdb
 nul
+
+# Tokens et secrets locaux (jamais committés)
+.env.local.secrets

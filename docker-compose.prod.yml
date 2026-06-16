@@ -1,0 +1,89 @@
+# docker-compose.prod.yml — overrides PROD.
+# Usage explicite :
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+
+services:
+  app:
+    build:
+      target: prod
+    image: backend-api:prod
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      AUTO_MIGRATE: "false"
+    # Pas de volume monté : le code est dans l'image (target=prod) et tout ce
+    # qui doit persister va sur Redis (sessions/cache/queue) ou S3 (uploads via
+    # TenantStorageManager). storage/logs sort sur stderr (php-fpm config).
+    volumes: []
+    healthcheck:
+      test: ["CMD", "php-fpm", "-t"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  frontend:
+    build:
+      target: prod
+    image: backend-api-frontend:prod
+    command: node server.js   # output standalone Next.js (next.config.js → output: 'standalone')
+    environment:
+      NODE_ENV: production
+    volumes: []   # pas de bind-mount en prod (build dans l'image)
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  nginx:
+    volumes:
+      - ./docker/nginx/default.prod.conf:/etc/nginx/conf.d/default.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro
+      - app-public:/var/www/html/public:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/up"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  worker:
+    image: backend-api:prod
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+    volumes: []
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  scheduler:
+    image: backend-api:prod
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+    volumes: []
+
+  redis:
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+volumes:
+  # En prod : extrait public/ de l'image app pour le servir via nginx.
+  # Hydrater au 1er `up` :
+  #   docker compose run --rm app sh -c "cp -r public/. /shared-public/"
+  app-public:

@@ -1,0 +1,103 @@
+# docker-compose.yml — base partagée dev + prod (backend + frontend unifiés).
+#
+# Stack complète :
+#   - app        : Laravel 12 (PHP-FPM)
+#   - frontend   : Next.js 15 (dans ./frontend/)
+#   - nginx      : reverse proxy unique, route /api/* + /sanctum/* vers Laravel,
+#                  tout le reste vers Next.js (pas de CORS, même origine)
+#   - redis      : cache/sessions/queue
+#   - worker     : php artisan queue:work
+#   - scheduler  : php artisan schedule:work
+#
+# Pas de MySQL : DB centrale + DB tenants sur cloud managé (.env DB_HOST).
+#
+# Usage :
+#   DEV  : docker compose up -d
+#   PROD : docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+
+name: backend-api
+
+services:
+  # --- PHP-FPM (Laravel) -----------------------------------------------------
+  app:
+    build:
+      context: .
+      target: dev
+    image: backend-api:dev
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - ./:/var/www/html
+    depends_on:
+      - redis
+    networks: [backend]
+
+  # --- Next.js (frontend) ----------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      target: dev
+    image: backend-api-frontend:dev
+    restart: unless-stopped
+    env_file: ./frontend/.env
+    environment:
+      # Le frontend appelle /api/* → nginx → Laravel. URL relative => pas besoin
+      # d'exposer le hostname Laravel publiquement.
+      NEXT_TELEMETRY_DISABLED: "1"
+    volumes:
+      - ./frontend:/app
+      - frontend-node-modules:/app/node_modules
+      - frontend-next-cache:/app/.next
+    networks: [backend]
+
+  # --- Nginx (reverse proxy unique : Laravel + Next.js sur même domaine) -----
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on: [app, frontend]
+    volumes:
+      - ./:/var/www/html:ro
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "80:80"
+    networks: [backend]
+
+  # --- Redis (local au VPS — isolation tenant via préfixe stancl/tenancy) ----
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redis-data:/data
+    networks: [backend]
+
+  # --- Worker Laravel (queue:work) -------------------------------------------
+  worker:
+    image: backend-api:dev
+    restart: unless-stopped
+    env_file: .env
+    command: php artisan queue:work --tries=3 --timeout=90
+    volumes:
+      - ./:/var/www/html
+    depends_on: [redis]
+    networks: [backend]
+
+  # --- Scheduler Laravel (remplace cron) -------------------------------------
+  scheduler:
+    image: backend-api:dev
+    restart: unless-stopped
+    env_file: .env
+    command: php artisan schedule:work
+    volumes:
+      - ./:/var/www/html
+    depends_on: [redis]
+    networks: [backend]
+
+volumes:
+  redis-data:
+  frontend-node-modules:
+  frontend-next-cache:
+
+networks:
+  backend:
+    driver: bridge

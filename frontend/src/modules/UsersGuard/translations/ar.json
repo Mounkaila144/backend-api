@@ -1,0 +1,19 @@
+{
+  "Login": "تسجيل الدخول",
+  "Sign in to your account": "قم بتسجيل الدخول إلى حسابك",
+  "Tenant ID": "معرف المستأجر",
+  "Enter your tenant ID": "أدخل معرف المستأجر",
+  "Username": "اسم المستخدم",
+  "Enter your username": "أدخل اسم المستخدم",
+  "Password": "كلمة المرور",
+  "Enter your password": "أدخل كلمة المرور",
+  "Sign In": "تسجيل الدخول",
+  "Invalid credentials": "بيانات الاعتماد غير صحيحة",
+  "Login successful": "تم تسجيل الدخول بنجاح",
+  "Are you sure you want to logout?": "هل أنت متأكد أنك تريد تسجيل الخروج؟",
+  "Logout successful": "تم تسجيل الخروج بنجاح",
+  "My Profile": "ملفي الشخصي",
+  "Email": "البريد الإلكتروني",
+  "Name": "الاسم",
+  "Role": "الدور"
+}

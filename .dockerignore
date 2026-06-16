@@ -1,0 +1,55 @@
+# Versionnement
+.git
+.gitignore
+.gitattributes
+
+# Dépendances (réinstallées via composer/npm dans l'image)
+vendor/
+node_modules/
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# Build artefacts
+public/build/
+public/hot
+public/storage
+
+# Données runtime (montées via volumes en dev, recréées en prod)
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+storage/framework/testing/*
+storage/logs/*
+bootstrap/cache/*.php
+database/database.sqlite
+
+# Environnements locaux (le .env est monté/injecté à l'exécution)
+.env
+.env.*
+!.env.example
+
+# IDE / OS
+.idea/
+.vscode/
+.fleet/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Tests / qualité
+.phpunit.cache/
+.phpunit.result.cache
+coverage/
+.pint.cache
+
+# Outils & docs hors-image
+docker-compose*.yml
+README.md
+TUTORIEL_*.md
+*.log
+
+# Specifique projet — fichiers locaux qu'on ne veut pas dans l'image
+fix-admin-permissions.php
+sites/
+dump.rdb
