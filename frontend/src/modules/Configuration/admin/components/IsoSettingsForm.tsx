@@ -109,7 +109,7 @@ export default function IsoSettingsForm() {
   // ─── Update helpers ──────────────────────────────────────────────────────
 
   const update = (key: string, value: unknown) => {
-    setSettings(prev => (prev ? { ...prev, [key]: value } : prev))
+    setSettings(prev => (prev ? ({ ...prev, [key]: value } as IsoSettingsRaw) : prev))
     setDirty(true)
   }
 

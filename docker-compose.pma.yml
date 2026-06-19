@@ -1,0 +1,31 @@
+# Override optionnel : ajoute phpMyAdmin (branché sur le RDS) derrière nginx.
+# Usage :
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.pma.yml up -d
+#
+# Accès : https://dbadmin.icall26.ptrniger.com (auth HTTP : voir docker/nginx/.htpasswd)
+# Login MySQL : utilisateur/mot de passe RDS (nigerdev / ...).
+
+services:
+  phpmyadmin:
+    image: phpmyadmin:5
+    restart: unless-stopped
+    environment:
+      PMA_HOST: database-1.cfcqkqei4rlq.eu-west-3.rds.amazonaws.com
+      PMA_PORT: "3306"
+      # Imports jusqu'à ~1 Go (marge à 2 Go). UPLOAD_LIMIT règle à la fois
+      # upload_max_filesize et post_max_size côté PHP du conteneur phpMyAdmin.
+      UPLOAD_LIMIT: 2048M
+      MEMORY_LIMIT: 1024M
+      MAX_EXECUTION_TIME: "1800"
+    networks: [backend]
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  nginx:
+    volumes:
+      - ./docker/nginx/dbadmin.conf:/etc/nginx/conf.d/dbadmin.conf:ro
+      - ./docker/nginx/.htpasswd:/etc/nginx/.htpasswd:ro
+    depends_on:
+      - phpmyadmin

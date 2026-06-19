@@ -67,6 +67,10 @@ RUN apk add --no-cache libc6-compat \
     && npm install -g pnpm@${PNPM_VERSION}
 
 ENV NEXT_TELEMETRY_DISABLED=1
+# Le build Next.js (génération statique) dépasse la heap V8 par défaut sur une
+# petite instance → "JavaScript heap out of memory". On relève la limite ; le
+# dépassement éventuel est absorbé par le swap de l'hôte.
+ENV NODE_OPTIONS=--max-old-space-size=4096
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
@@ -74,6 +78,13 @@ COPY . .
 # Variables build-time (NEXT_PUBLIC_*).
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
+# Régénère les assets dérivés avant le build : `COPY . .` a repris la source de
+# l'hôte sans `generated-icons.css` (fichier généré, gitignoré), et le client
+# Prisma doit exister. Sans ça `next build` échoue sur
+# `@assets/iconify-icons/generated-icons.css` introuvable.
+RUN pnpm build:icons \
+    && pnpm exec prisma generate
 
 RUN pnpm build
 

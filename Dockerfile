@@ -24,7 +24,8 @@ RUN composer install \
         --no-autoloader \
         --prefer-dist \
         --no-interaction \
-        --no-progress
+        --no-progress \
+        --ignore-platform-reqs
 
 # ============================================================================
 # Stage 2: base — PHP-FPM avec toutes les extensions et binaires nécessaires

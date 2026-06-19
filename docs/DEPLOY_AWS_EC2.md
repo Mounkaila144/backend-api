@@ -1,4 +1,11 @@
 # Déployer le projet Laravel sur un serveur AWS EC2
+
+> ℹ️ **La production tourne désormais avec Docker.** Pour la méthode réellement
+> utilisée (Docker Compose + images du dépôt, SSL wildcard, phpMyAdmin, pièges
+> rencontrés), voir **[`DEPLOY_AWS_EC2_DOCKER.md`](./DEPLOY_AWS_EC2_DOCKER.md)**.
+> Le guide ci-dessous décrit l'alternative en **installation native**
+> (php/nginx/supervisor sur l'hôte), conservée pour référence.
+
 ssh -i "C:\Users\Mounkaila\Downloads\icall26ec2.pem" ubuntu@15.188.10.76
 
 Ce guide explique comment installer `backend-api` sur un serveur **EC2 (Ubuntu)**

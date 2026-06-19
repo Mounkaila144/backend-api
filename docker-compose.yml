@@ -26,8 +26,9 @@ services:
     image: backend-api:dev
     restart: unless-stopped
     env_file: .env
-    volumes:
-      - ./:/var/www/html
+    # Les bind-mounts de dev (hot-reload) sont dans docker-compose.override.yml,
+    # chargé seulement par `docker compose up` sans -f. En prod le code est dans
+    # l'image (target=prod), donc aucun volume ici ne doit masquer /var/www/html.
     depends_on:
       - redis
     networks: [backend]
@@ -44,10 +45,6 @@ services:
       # Le frontend appelle /api/* → nginx → Laravel. URL relative => pas besoin
       # d'exposer le hostname Laravel publiquement.
       NEXT_TELEMETRY_DISABLED: "1"
-    volumes:
-      - ./frontend:/app
-      - frontend-node-modules:/app/node_modules
-      - frontend-next-cache:/app/.next
     networks: [backend]
 
   # --- Nginx (reverse proxy unique : Laravel + Next.js sur même domaine) -----
@@ -55,9 +52,6 @@ services:
     image: nginx:1.27-alpine
     restart: unless-stopped
     depends_on: [app, frontend]
-    volumes:
-      - ./:/var/www/html:ro
-      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     ports:
       - "80:80"
     networks: [backend]
@@ -77,8 +71,6 @@ services:
     restart: unless-stopped
     env_file: .env
     command: php artisan queue:work --tries=3 --timeout=90
-    volumes:
-      - ./:/var/www/html
     depends_on: [redis]
     networks: [backend]
 
@@ -88,8 +80,6 @@ services:
     restart: unless-stopped
     env_file: .env
     command: php artisan schedule:work
-    volumes:
-      - ./:/var/www/html
     depends_on: [redis]
     networks: [backend]
 

@@ -29,3 +29,6 @@ nul
 
 # Tokens et secrets locaux (jamais committés)
 .env.local.secrets
+
+# Déploiement serveur — identifiants auth HTTP phpMyAdmin (à régénérer par serveur)
+docker/nginx/.htpasswd
