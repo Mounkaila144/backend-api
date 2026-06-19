@@ -1,0 +1,133 @@
+name: Build & Deploy (prod)
+
+# Déploiement continu : à chaque push sur master, on construit les images sur les
+# runners GitHub (pas sur l'EC2 qui manque de RAM), on les publie sur GHCR, puis
+# on déploie sur le serveur par SSH (pull + up + hydratation + migrations).
+#
+# Déclenchement manuel possible via l'onglet Actions (workflow_dispatch).
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch: {}
+
+# Empêche deux déploiements concurrents de se marcher dessus.
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+env:
+  IMAGE_APP: ghcr.io/${{ github.repository_owner }}/backend-api-app
+  IMAGE_FRONTEND: ghcr.io/${{ github.repository_owner }}/backend-api-frontend
+
+jobs:
+  # ───────────────────────────── Build & push ─────────────────────────────
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      tag: ${{ steps.meta.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: meta
+        name: Calculer le tag (SHA court, en minuscules)
+        run: |
+          echo "sha=$(echo ${GITHUB_SHA} | cut -c1-12)" >> "$GITHUB_OUTPUT"
+          echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Connexion à GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push image app (Laravel/PHP-FPM)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: prod
+          push: true
+          tags: |
+            ghcr.io/${{ steps.meta.outputs.owner }}/backend-api-app:${{ steps.meta.outputs.sha }}
+            ghcr.io/${{ steps.meta.outputs.owner }}/backend-api-app:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build & push image frontend (Next.js)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          target: prod
+          push: true
+          build-args: |
+            NEXT_PUBLIC_API_URL=/api
+          tags: |
+            ghcr.io/${{ steps.meta.outputs.owner }}/backend-api-frontend:${{ steps.meta.outputs.sha }}
+            ghcr.io/${{ steps.meta.outputs.owner }}/backend-api-frontend:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ─────────────────────────────── Deploy ─────────────────────────────────
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    # Environnement « production » : permet d'exiger une approbation manuelle
+    # (Settings > Environments > production > Required reviewers).
+    environment: production
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - name: Déploiement SSH sur l'EC2
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          envs: IMAGE_TAG,GHCR_USER,GHCR_TOKEN
+          script_stop: true
+          command_timeout: 20m
+          script: |
+            set -euo pipefail
+            cd /var/www/backend-api
+
+            # Owner GHCR en minuscules (obligatoire pour le chemin d'image)
+            OWNER_LC=$(echo "$GHCR_USER" | tr '[:upper:]' '[:lower:]')
+
+            # Auth GHCR éphémère (token du run, jamais stocké sur le serveur)
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+
+            # Synchroniser les fichiers de déploiement (compose, scripts) sur master
+            git fetch origin master
+            git checkout master
+            git reset --hard origin/master
+
+            export IMAGE_TAG="$IMAGE_TAG"
+            CMP="docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.deploy.yml"
+
+            # Récupérer les nouvelles images et (re)démarrer
+            $CMP pull
+            $CMP up -d --remove-orphans
+
+            # Hydrater le volume public servi par nginx (depuis la nouvelle image app)
+            docker run --rm --user root --entrypoint sh \
+              -v backend-api_app-public:/dest \
+              "ghcr.io/${OWNER_LC}/backend-api-app:${IMAGE_TAG}" \
+              -c "cp -r /var/www/html/public/. /dest/"
+
+            # Migrations base centrale (conteneur jetable, sans toucher aux services)
+            $CMP run --rm --no-deps app php artisan migrate --force
+
+            # Nettoyage des images obsolètes (évite de saturer le disque)
+            docker image prune -f
+            docker logout ghcr.io || true
+        env:
+          IMAGE_TAG: ${{ needs.build.outputs.tag }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}

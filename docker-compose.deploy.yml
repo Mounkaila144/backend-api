@@ -1,0 +1,23 @@
+# Override CI/CD — utilise les images pré-construites publiées sur GHCR par le
+# pipeline GitHub Actions, au lieu de builder sur le serveur (qui manque de RAM).
+#
+# Usage (sur le serveur, piloté par .github/workflows/deploy.yml) :
+#   export IMAGE_TAG=<sha>
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.deploy.yml pull
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.deploy.yml up -d
+#
+# IMAGE_TAG = SHA court du commit déployé (rollback = relancer avec un ancien SHA).
+# L'owner GHCR doit être en minuscules : mounkaila144.
+
+services:
+  app:
+    image: ghcr.io/mounkaila144/backend-api-app:${IMAGE_TAG:-latest}
+
+  worker:
+    image: ghcr.io/mounkaila144/backend-api-app:${IMAGE_TAG:-latest}
+
+  scheduler:
+    image: ghcr.io/mounkaila144/backend-api-app:${IMAGE_TAG:-latest}
+
+  frontend:
+    image: ghcr.io/mounkaila144/backend-api-frontend:${IMAGE_TAG:-latest}

@@ -264,15 +264,49 @@ ssh -T git@github.com              # doit saluer le compte
 
 ---
 
-## 11. Redéploiement (mise à jour)
+## 11. CI/CD — déploiement continu (GitHub Actions + GHCR)
+
+À chaque `push` sur `master`, le workflow `.github/workflows/deploy.yml` :
+1. **construit** les images `app` et `frontend` sur les runners GitHub (pas sur
+   l'EC2 qui manque de RAM) ;
+2. les **publie** sur GHCR, taguées `:<sha>` **et** `:latest` ;
+3. **déploie** par SSH : `docker compose pull` (override `docker-compose.deploy.yml`
+   → images GHCR), `up -d`, hydratation du volume `app-public`, `migrate --force`,
+   puis `docker image prune`.
+
+### Configuration unique (à faire une fois)
+
+**Secrets GitHub** (Settings → Secrets and variables → Actions → *New repository secret*) :
+
+| Secret | Valeur |
+|---|---|
+| `EC2_HOST` | `13.38.184.4` |
+| `EC2_USER` | `ubuntu` |
+| `EC2_SSH_KEY` | clé **privée** `~/.ssh/ci_deploy` du serveur (dédiée CI ; la publique est dans `~/.ssh/authorized_keys`) |
+
+- **Actions → General → Workflow permissions** : « Read and write » (publication GHCR via `GITHUB_TOKEN`).
+- (Recommandé) **Settings → Environments → `production`** : ajoute un *Required reviewer*
+  pour exiger une approbation manuelle avant chaque déploiement.
+- Le serveur doit être sur la branche `master` (`git checkout master`).
+
+### Rollback
+
+Le pipeline tague chaque image par SHA. Pour revenir à une version :
+
+```bash
+cd /var/www/backend-api
+export IMAGE_TAG=<ancien_sha_court>
+CMP="docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.deploy.yml"
+echo <token> | docker login ghcr.io -u <user> --password-stdin   # si paquet privé
+$CMP pull && $CMP up -d
+```
+
+### Repli : déploiement manuel (sans CI)
 
 ```bash
 cd /var/www/backend-api
 CMP="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
-git pull
-$CMP build
-$CMP up -d
-# Re-hydrater public/ si le contenu a changé :
+git pull && $CMP build && $CMP up -d
 docker run --rm --user root --entrypoint sh -v backend-api_app-public:/dest \
   backend-api:prod -c "cp -r /var/www/html/public/. /dest/"
 $CMP exec app php artisan migrate --force
