@@ -296,10 +296,13 @@ Le pipeline tague chaque image par SHA. Pour revenir à une version :
 ```bash
 cd /var/www/backend-api
 export IMAGE_TAG=<ancien_sha_court>
-CMP="docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.deploy.yml"
+CMP="docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.deploy.yml -f docker-compose.pma.yml"
 echo <token> | docker login ghcr.io -u <user> --password-stdin   # si paquet privé
 $CMP pull && $CMP up -d
 ```
+
+> ⚠️ Toujours inclure `-f docker-compose.pma.yml` dans les `up`/`pull`/`down`,
+> sinon nginx perd la conf `dbadmin` et phpMyAdmin retombe sur Laravel.
 
 ### Repli : déploiement manuel (sans CI)
 
