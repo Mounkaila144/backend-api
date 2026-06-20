@@ -116,6 +116,10 @@ jobs:
             $CMP pull
             $CMP up -d --remove-orphans
 
+            # Recharger nginx : les conteneurs app/frontend recréés changent d'IP
+            # dans le réseau Docker, sinon nginx garde l'ancienne upstream -> 502.
+            $CMP restart nginx
+
             # Hydrater le volume public servi par nginx (depuis la nouvelle image app)
             docker run --rm --user root --entrypoint sh \
               -v backend-api_app-public:/dest \
