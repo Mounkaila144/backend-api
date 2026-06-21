@@ -162,7 +162,7 @@ export default function SitesTable({
         cell: ({ row }) => {
           const typeInfo = getTypeLabel(row.original.type)
 
-          
+
 return <Chip label={typeInfo.label} size='small' color={typeInfo.color} />
         }
       }),
@@ -201,32 +201,7 @@ return <Chip label={typeInfo.label} size='small' color={typeInfo.color} />
 
           return (
             <div className='flex items-center gap-0.5'>
-              {!isUptodate ? (
-                <Tooltip title='Activer le site (exécuter les migrations)'>
-                  <span>
-                    <IconButton
-                      size='small'
-                      onClick={() => onActivate(row.original)}
-                      color='warning'
-                      disabled={isActivating}
-                    >
-                      {isActivating ? (
-                        <CircularProgress size={16} color='warning' />
-                      ) : (
-                        <i className='ri-play-circle-line' />
-                      )}
-                    </IconButton>
-                  </span>
-                </Tooltip>
-              ) : (
-                <Tooltip title='Site activé (migrations à jour)'>
-                  <span>
-                    <IconButton size='small' color='success' disabled>
-                      <i className='ri-checkbox-circle-line' />
-                    </IconButton>
-                  </span>
-                </Tooltip>
-              )}
+
               <IconButton size='small' onClick={() => onManageModules(row.original)} color='info' title='Gérer les modules'>
                 <i className='tabler-anchor' />
               </IconButton>
