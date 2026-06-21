@@ -108,11 +108,17 @@ jobs:
             git reset --hard origin/master
 
             export IMAGE_TAG="$IMAGE_TAG"
-            CMP="docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.deploy.yml"
+            # Inclut l'override pma : sinon nginx perd la conf dbadmin et phpMyAdmin
+            # retombe sur Laravel. .htpasswd reste sur le serveur (gitignoré).
+            CMP="docker compose -f docker-compose.yml -f docker-compose.prod.yml -f docker-compose.deploy.yml -f docker-compose.pma.yml"
 
             # Récupérer les nouvelles images et (re)démarrer
             $CMP pull
             $CMP up -d --remove-orphans
+
+            # Recharger nginx : les conteneurs app/frontend recréés changent d'IP
+            # dans le réseau Docker, sinon nginx garde l'ancienne upstream -> 502.
+            $CMP restart nginx
 
             # Hydrater le volume public servi par nginx (depuis la nouvelle image app)
             docker run --rm --user root --entrypoint sh \

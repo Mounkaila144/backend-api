@@ -63,7 +63,8 @@ FROM node:${NODE_VERSION}-alpine AS builder
 ARG PNPM_VERSION
 WORKDIR /app
 
-RUN apk add --no-cache libc6-compat \
+# openssl : nécessaire pour que `prisma generate` cible le bon moteur (OpenSSL 3)
+RUN apk add --no-cache libc6-compat openssl \
     && npm install -g pnpm@${PNPM_VERSION}
 
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -98,7 +99,11 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
-RUN addgroup -g 1001 -S nodejs \
+# openssl + libc6-compat : sinon Prisma ne détecte pas OpenSSL 3 au runtime et
+# tente de charger son moteur OpenSSL 1.1 (libssl.so.1.1 absent) → crash du
+# serveur Node (unhandledRejection) au boot.
+RUN apk add --no-cache openssl libc6-compat \
+    && addgroup -g 1001 -S nodejs \
     && adduser -S nextjs -u 1001
 
 # Output standalone : copie minimale (server.js + node_modules figées + assets)
